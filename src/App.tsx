@@ -55,8 +55,6 @@ const App = () => {
   const synth = useRef(null);
   const midiData = useRef(null);
 
-  // We separate active notes into "Realtime" (played by user) and "Playback" (from file)
-  // to ensure seeking works correctly without needing to rely on Tone.Draw callbacks
   const realtimeActiveNotes = useRef(new Set());
   const playbackActiveNotes = useRef(new Set());
 
@@ -129,9 +127,7 @@ const App = () => {
   };
 
   const getMIDIMessage = (message) => {
-    // Removed the audioEnabled check here to prevent stale closure issues.
-    // Visuals will work immediately, and audio will work once Tone context is running.
-
+    // Allow visual feedback even if audio context isn't running yet
     const [command, note, velocity] = message.data;
     const cmd = command >> 4;
 
@@ -145,6 +141,7 @@ const App = () => {
   };
 
   const triggerRealtimeAttack = (note, velocity) => {
+    // Only trigger audio if context is running
     if (synth.current && Tone.context.state === "running") {
       synth.current.triggerAttack(
         Tone.Frequency(note, "midi").toNote(),
@@ -182,7 +179,6 @@ const App = () => {
     playbackActiveNotes.current.clear();
 
     try {
-      // Auto-enable audio on upload if not already
       if (!audioEnabled) {
         await enableAudio();
       }
@@ -192,8 +188,7 @@ const App = () => {
       midiData.current = midi;
       setDuration(midi.duration);
 
-      // Schedule Tone.js events purely for Audio
-      // We handle Visuals in the draw loop for better seek performance
+      // Schedule Audio Events
       midi.tracks.forEach((track) => {
         track.notes.forEach((note) => {
           Tone.Transport.schedule((time) => {
@@ -234,7 +229,6 @@ const App = () => {
     Tone.Transport.seconds = newTime;
     setCurrentTime(newTime);
 
-    // Release any stuck synthesizer notes
     if (synth.current) {
       synth.current.releaseAll();
     }
@@ -242,7 +236,6 @@ const App = () => {
 
   const handleSeekStart = () => {
     setIsDraggingSlider(true);
-    // Optional: Pause while seeking for smoother UX
   };
 
   const handleSeekEnd = () => {
@@ -268,13 +261,24 @@ const App = () => {
     return { whiteKeyWidth, blackKeyWidth };
   };
 
+  // CORRECTED getNoteX function
   const getNoteX = (note, whiteKeyWidth) => {
     let whiteKeyIndex = 0;
+    // Count how many white keys precede this note
     for (let i = FIRST_NOTE; i < note; i++) {
       if (!isBlack(i)) whiteKeyIndex++;
     }
-    const offset = !isBlack(note) ? 0 : (whiteKeyWidth * 0.6);
-    return (whiteKeyIndex * whiteKeyWidth) + offset;
+
+    const blackKeyWidth = whiteKeyWidth * 0.65;
+
+    if (isBlack(note)) {
+      // Center black key on the crack to the right of the preceding white key
+      // whiteKeyIndex here represents the white key to the right of the crack
+      // so we multiply by Width to get to that crack, then subtract half black key width
+      return (whiteKeyIndex * whiteKeyWidth) - (blackKeyWidth / 2);
+    } else {
+      return (whiteKeyIndex * whiteKeyWidth);
+    }
   };
 
   // Main Draw Loop
@@ -286,14 +290,10 @@ const App = () => {
     const height = canvas.height;
     const { whiteKeyWidth, blackKeyWidth } = getKeyGeometry(width);
 
-    // Update Slider Sync (if not dragging)
+    // Update Slider
     const now = Tone.Transport.seconds;
     if (!isDraggingSlider && progressBarRef.current && isReady) {
       progressBarRef.current.value = now;
-      // Update text display occasionally (every 10 frames roughly or just let react handle it?
-      // Direct ref update is better for perf, but state for text is fine if we accept 60fps renders)
-      // We'll update React state for the time display here, but maybe throttle it in a real app.
-      // For this MVP, we will update it every frame.
       setCurrentTime(now);
     }
 
@@ -301,20 +301,20 @@ const App = () => {
     ctx.fillStyle = COLORS.background;
     ctx.fillRect(0, 0, width, height);
 
-    // 2. Process MIDI Data for Visuals (Falling Notes + Active Playback Notes)
-    playbackActiveNotes.current.clear(); // Reset frame's active playback notes
+    // 2. Process MIDI Data for Visuals
+    playbackActiveNotes.current.clear();
 
     if (midiData.current) {
       const viewWindow = (height - KEYBOARD_HEIGHT) / NOTE_FALL_SPEED;
 
       midiData.current.tracks.forEach((track) => {
         track.notes.forEach((note) => {
-          // A. Identify if note is currently playing (for keyboard highlight)
+          // A. Active Notes
           if (now >= note.time && now < note.time + note.duration) {
             playbackActiveNotes.current.add(note.midi);
           }
 
-          // B. Draw Falling Note (Future)
+          // B. Falling Notes
           const timeUntilHit = note.time - now;
           if (timeUntilHit < viewWindow && timeUntilHit + note.duration > 0) {
             const y = (height - KEYBOARD_HEIGHT) -
@@ -325,7 +325,6 @@ const App = () => {
             const w = isBlack(note.midi) ? blackKeyWidth : whiteKeyWidth - 2;
 
             ctx.fillStyle = COLORS.fallingNote;
-            // Simple opacity fade based on height
             ctx.globalAlpha = 0.8;
             ctx.fillRect(x, y - noteHeight, w, noteHeight);
             ctx.globalAlpha = 1.0;
@@ -341,14 +340,13 @@ const App = () => {
     let currentX = 0;
     for (let i = FIRST_NOTE; i <= LAST_NOTE; i++) {
       if (!isBlack(i)) {
-        // Active if pressed by user OR playing from file
         const isActive = realtimeActiveNotes.current.has(i) ||
           playbackActiveNotes.current.has(i);
 
         ctx.fillStyle = isActive ? COLORS.activeWhite : COLORS.whiteKey;
         ctx.fillRect(currentX, keyTop, whiteKeyWidth - 1, KEYBOARD_HEIGHT);
 
-        // 3D Shadow
+        // Shadow
         if (!isActive) {
           ctx.fillStyle = "#cbd5e1";
           ctx.fillRect(
@@ -392,7 +390,7 @@ const App = () => {
     ctx.stroke();
 
     reqRef.current = requestAnimationFrame(draw);
-  }, [isReady, isDraggingSlider]); // Depend on dragging state to pause slider updates
+  }, [isReady, isDraggingSlider]);
 
   useEffect(() => {
     reqRef.current = requestAnimationFrame(draw);
@@ -422,7 +420,7 @@ const App = () => {
 
       {/* Header */}
       <header className="flex flex-col gap-4 px-6 py-4 bg-slate-800 border-b border-slate-700 shadow-lg z-10">
-        {/* Top Row: Logo & Main Controls */}
+        {/* Top Row */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-blue-600 rounded-lg">
@@ -513,7 +511,7 @@ const App = () => {
           </div>
         </div>
 
-        {/* Bottom Row: Scrubber / Timeline (Only visible if file loaded) */}
+        {/* Scrubber */}
         {isReady && (
           <div className="flex items-center gap-4 w-full">
             <span className="text-xs text-slate-400 w-10 text-right">
