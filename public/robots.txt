@@ -1,0 +1,6 @@
+# robots.txt for FlowKeys MIDI Visualizer
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://flowkeys.app/sitemap.xml
