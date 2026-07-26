@@ -1,157 +1,293 @@
 # AGENTS.md
 
-This file is a guide for AI coding agents and maintainers working on FlowKeys. Read this before making structural changes, especially in `src/App.tsx`.
+This file is a guide for AI coding agents and maintainers working on FlowKeys. Read this before making structural changes, especially in `src/App.tsx` and the feature/component modules it coordinates.
 
 ## Project Summary
 
 FlowKeys is a React/Vite browser app that visualizes MIDI notes on an 88-key piano using the Canvas 2D API. It supports:
 
 - A generated demo song loaded on startup.
-- User-uploaded `.mid`/`.midi` files parsed locally in `src/App.tsx`.
+- User-uploaded `.mid`/`.midi` files parsed locally in `src/features/audio/midi.ts`.
 - Live hardware MIDI input through the Web MIDI API.
 - Lightweight synthesized audio through the Web Audio API.
 - Falling note bars, active key highlights, left/right hand colors, and particle sparks.
 - Experimental OPFS/Web Worker frame capture for video export.
 - PWA manifest/service-worker setup through `vite-plugin-pwa`.
 
-## Important Files
+## Current Project Structure
 
 ```text
-src/App.tsx       Main app. Contains classes, MIDI parser, synth, render loop, UI, export flow.
-src/main.tsx      React entry point. Registers the generated PWA service worker.
-src/index.css     Tailwind CSS import only.
-vite.config.ts    Vite plugins: React, Tailwind, PWA manifest/workbox config.
-package.json      npm scripts and dependencies.
-README.md         User-facing project docs.
-AGENTS.md         This agent-facing implementation guide.
+src/
+├── App.tsx                         Main app coordinator: state, refs, MIDI wiring, render loop, export flow.
+├── App.css                         App stylesheet if used by future UI work.
+├── index.css                       Tailwind CSS import.
+├── main.tsx                        React entry point + generated PWA service worker registration.
+├── vite-env.d.ts                   Vite/PWA references plus shared global app/browser types.
+├── assets/
+│   └── react.svg                   Static asset from the original Vite scaffold; not part of core flow.
+├── components/
+│   ├── EnableAudioBanner.tsx       Audio-autoplay prompt banner.
+│   ├── ErrorMessageBanner.tsx      Dismissible top error banner.
+│   ├── ExportOverlay.tsx           Recording/processing/ready export modal overlay.
+│   ├── HandBadge.tsx               Left/right hand color picker badge and current file name display.
+│   └── Toolbar.tsx                 Header toolbar: branding, timeline, speed, particles, mute, upload, export, play/pause.
+├── constants/
+│   └── layout.ts                   Piano constants: A0-C8 range, keyboard height, hand split.
+└── features/
+    ├── audio/
+    │   ├── WebAudioSynth.ts        Custom oscillator-based Web Audio synth.
+    │   └── midi.ts                 Built-in MIDI parser; returns normalized note data.
+    ├── canvas/
+    │   └── Particles.tsx           Particle and ParticlePool classes used by the canvas renderer.
+    ├── export/                     Reserved for future export extraction; export logic currently remains in App.tsx.
+    └── layout/
+        └── layoutUtils.ts          Canvas/layout helpers: keyboard layout, colors, time formatting, black-key test.
+```
+
+Root-level files:
+
+```text
+vite.config.ts       Vite plugins: React, Tailwind, PWA manifest/workbox config.
+eslint.config.js     ESLint flat config; ignores generated dist/dev-dist output.
+package.json         npm scripts and dependencies.
+README.md            User-facing project docs.
+AGENTS.md            This agent-facing implementation guide.
 ```
 
 ## Current Architecture
 
-The app is intentionally compact but `src/App.tsx` is doing many jobs. Treat it as the source of truth for current behavior.
+`src/App.tsx` is no longer a completely single-file implementation. It still owns orchestration and the performance-sensitive render loop, while reusable UI and low-level helpers have been extracted.
 
 ```mermaid
 flowchart TD
-    App[App component] --> MIDI[Web MIDI setup]
-    App --> Parser[Built-in MIDI parser]
-    App --> Synth[WebAudioSynth]
-    App --> Canvas[Canvas render loop]
-    App --> Export[OPFS export worker]
-    App --> UI[React controls]
-    MIDI --> ActiveNotes[activeNotes ref]
-    Parser --> MidiData[midiData ref]
-    UI --> PlaybackRefs[playback refs + React state]
-    MidiData --> Canvas
-    ActiveNotes --> Canvas
-    PlaybackRefs --> Canvas
-    Canvas --> Synth
-    Canvas --> Export
+    App[App.tsx coordinator] --> UI[components/*]
+    App --> Synth[features/audio/WebAudioSynth.ts]
+    App --> Parser[features/audio/midi.ts]
+    App --> Particles[features/canvas/Particles.tsx]
+    App --> Layout[features/layout/layoutUtils.ts]
+    Layout --> Constants[constants/layout.ts]
+    App --> Export[Inline OPFS worker/export flow]
+    App --> Types[vite-env.d.ts global types]
+    UI --> Layout
+    Parser --> Types
+    Synth --> Types
+    Particles --> Canvas[Canvas 2D context]
+    Layout --> Canvas
 ```
 
-## `src/App.tsx` Map
+## Module Responsibilities
 
-### Top-level utility/classes
+### `src/App.tsx`
+
+`App.tsx` is the app coordinator and source of truth for runtime behavior. It imports extracted modules and owns:
 
 - `WORKER_CODE`
   - Inline JavaScript string used to create a Web Worker at runtime.
   - Worker writes PNG frame blobs into OPFS under a `frames` directory.
   - Supports `init`, `saveFrame`, and `clear` messages.
+  - If export grows, this is a good candidate to move into `src/features/export/`.
+
+- Long-lived refs
+  - `canvasRef`: the `<canvas>` element.
+  - `audioSynth`: one `WebAudioSynth` instance for the app lifetime.
+  - `particlePoolRef`: one `ParticlePool(900)` for object-pooled sparks.
+  - `activeNotes`: live MIDI active-note map.
+  - `midiData`: current demo/uploaded MIDI data.
+  - `reqRef`, `lastTimeRef`, `playbackStartTime`, `pausedTime`, `lastTimeSec`: animation/playback timing.
+  - `workerRef`, `exportFrameCountRef`, `pendingFramesRef`, `isExportingRef`, `isCapturingFrameRef`: export bookkeeping.
+
+- React state
+  - `isPlaying`, `isReady`, `duration`, `currentTime`, `midiDevices`, `fileName`
+  - `fallSpeed`, `isMuted`, `particlesEnabled`
+  - `exportState`, `exportMessage`, `exportProgress`, `errorMessage`
+  - `leftColor`, `rightColor`, `audioEnabled`
+
+- Event handlers and flows
+  - Audio initialization (`handleEnableAudio`).
+  - Web MIDI success/failure and message handling.
+  - Demo song generation.
+  - MIDI file loading via `parseMIDIArrayBuffer`.
+  - Play/pause/seek/mute/particles.
+  - OPFS export start, mock encoding, and download.
+  - Canvas resize and animation-frame scheduling.
+
+- `renderCanvas`
+  - The performance-sensitive Canvas 2D renderer.
+  - Reads playback refs/state and `midiData.current`.
+  - Uses `getLayout`, `isBlackKey`, `hexToRgba`, and `getSparkColors` from `layoutUtils.ts`.
+  - Draws falling notes, hit line, particles, white keys, and black keys.
+  - Triggers playback audio when notes cross the playback cursor.
+  - Captures PNG frames for export when `isExportingRef.current` is true.
+
+### `src/components/EnableAudioBanner.tsx`
+
+UI-only component for browser autoplay rules.
+
+- Props:
+  - `onEnableAudio: () => void`
+- Shows a blue top banner until `audioEnabled` is true.
+- Calls back into `App.tsx` so the app can initialize/resume the Web Audio context.
+
+### `src/components/Toolbar.tsx`
+
+Header toolbar component.
+
+- Displays FlowKeys branding and hardware MIDI connection status.
+- Contains the timeline slider and formatted current/duration times.
+- Contains speed, particle, mute, upload, export, and play/pause controls.
+- Imports `formatTime` from `src/features/layout/layoutUtils.ts`.
+- Receives all behavior as props from `App.tsx`; keep it presentational.
+
+Important props include:
+
+- UI values: `currentTime`, `duration`, `exportState`, `fallSpeed`, `isMuted`, `isPlaying`, `isReady`, `midiDevices`, `particlesEnabled`
+- callbacks: `onFallSpeedChange`, `onFileUpload`, `onSeek`, `onStartExport`, `onToggleMute`, `onToggleParticles`, `onTogglePlay`
+
+### `src/components/ErrorMessageBanner.tsx`
+
+Dismissible error banner.
+
+- Props:
+  - `message: string`
+  - `onDismiss: () => void`
+- Returns `null` when there is no message.
+- Do not put app error state in this component; keep it controlled by `App.tsx`.
+
+### `src/components/ExportOverlay.tsx`
+
+Modal overlay for export state.
+
+- Props:
+  - `exportFrameCount`, `exportMessage`, `exportProgress`, `exportState`
+  - `onClose`, `onDownloadVideo`
+- Renders different content for `recording`, `processing`, and `ready` states.
+- Returns `null` for `idle`.
+- This is only UI. OPFS, worker, and mock encoding logic currently remain in `App.tsx`.
+
+### `src/components/HandBadge.tsx`
+
+Floating canvas badge for hand colors and current file name.
+
+- Props:
+  - `fileName`
+  - `leftColor`, `rightColor`
+  - `onLeftColorChange`, `onRightColorChange`
+- Color values flow back to `App.tsx`; canvas rendering uses the app state values.
+
+### `src/constants/layout.ts`
+
+Defines piano constants in one place:
+
+```ts
+FIRST_NOTE = 21; // A0
+LAST_NOTE = 108; // C8
+KEYBOARD_HEIGHT = 120;
+HAND_SPLIT_NOTE = 60; // Middle C
+```
+
+Exports them as `pianoConstants`.
+
+If you alter the key range or keyboard sizing, update this file and anything that assumes 88 keys / A0-C8 / 52 white keys.
+
+### `src/features/layout/layoutUtils.ts`
+
+Canvas/layout helper module.
+
+Exports:
+
+- `hexToRgba(hex, alpha)`
+  - Converts hex colors for canvas fill/glow values.
+- `getSparkColors(baseHex)`
+  - Builds a small color palette for sparks based on the current hand color.
+- `isBlackKey(midi)`
+  - Uses pitch classes `[1, 3, 6, 8, 10]`.
+- `formatTime(seconds)`
+  - Formats UI time as `m:ss`.
+- `getLayout(width)`
+  - Returns `{ positions, whiteKeyWidth, blackKeyWidth }` for MIDI notes A0-C8.
+  - White keys are assigned first with `width / 52`.
+  - Black keys are assigned second relative to the previous white key.
+
+`App.tsx` depends on these helpers in the render loop. Keep them fast and allocation-conscious.
+
+### `src/features/audio/WebAudioSynth.ts`
+
+Custom Web Audio synth. Do not assume Tone.js is used by the current app flow.
+
+- Lazily creates/resumes `AudioContext` in `init()`.
+- `playNote(midi, velocity)` creates oscillator/gain nodes and schedules a short envelope.
+- `stopNote(midi)` ramps active voice gain down and removes the voice from `activeVoices`.
+- `isMuted` is mutable and controlled by the mute button in `App.tsx`.
+- Uses the global `Voice` type declared in `src/vite-env.d.ts`.
+
+Audio safety notes:
+
+- Respect browser autoplay rules; initialize only from user gesture paths.
+- Avoid unbounded active voices; make sure voices are released/deleted.
+- Current behavior calls `stopNote(midi)` before retriggering the same note.
+
+### `src/features/audio/midi.ts`
+
+Built-in MIDI parser.
+
+- Reads `MThd` and `MTrk` chunks.
+- Handles variable-length integers, running status, note-on, note-off, tempo meta events, and common skipped MIDI event types.
+- Converts ticks to seconds using tempo changes.
+- Returns normalized `MidiData` with `{ notes, duration }`.
+- Uses global MIDI-related types declared in `src/vite-env.d.ts`.
+
+Parser safety notes:
+
+- Maintain support for running status.
+- Keep note-on with velocity `0` treated as note-off.
+- Preserve output shape expected by `App.tsx` and the canvas renderer.
+- Add focused tests or manual MIDI files when extending parser behavior.
+
+### `src/features/canvas/Particles.tsx`
+
+Particle system used by the render loop.
 
 - `Particle`
-  - Represents one spark particle.
-  - Has `spawn`, `update`, and `draw` methods.
-  - Uses simple velocity, gravity, alpha fade, and lifetime values.
-
+  - One spark particle with `spawn`, `update`, and `draw` methods.
 - `ParticlePool`
-  - Preallocates a pool of `Particle` objects to reduce per-frame allocations.
+  - Preallocates particles to reduce per-frame allocations.
   - `emit(x, y, color, count)` activates inactive particles.
   - `updateAndDraw(ctx, dt)` updates active particles and draws them with additive blending.
 
-- `WebAudioSynth`
-  - Custom Web Audio synth. Do not assume Tone.js is used by the current app flow.
-  - Lazily creates/resumes `AudioContext` in `init()`.
-  - `playNote(midi, velocity)` creates oscillator/gain nodes and schedules a short envelope.
-  - `stopNote(midi)` ramps active voice gain down and removes the voice from `activeVoices`.
-  - `isMuted` is a mutable property toggled from React UI.
+This file currently contains no JSX despite the `.tsx` extension. If renaming to `.ts`, update imports and validate.
 
-- `parseMIDIArrayBuffer(buffer)`
-  - Built-in MIDI parser.
-  - Reads `MThd` and `MTrk` chunks.
-  - Handles variable-length integers, running status, note-on, note-off, tempo meta events, and common skipped MIDI event types.
-  - Produces normalized `{ notes, duration }` data.
-  - The parser is not a complete MIDI implementation. If you extend it, add focused tests or test files manually.
+### `src/features/export/`
 
-- Constants/helpers
-  - `FIRST_NOTE = 21` (`A0`)
-  - `LAST_NOTE = 108` (`C8`)
-  - `KEYBOARD_HEIGHT = 120`
-  - `HAND_SPLIT_NOTE = 60` (Middle C)
-  - `hexToRgba`, `getSparkColors`, `isBlackKey`, `formatTime`
+Currently present as a feature folder but not yet populated. Export behavior is still in `App.tsx`:
 
-### Main `App` component refs
+- Inline worker code.
+- OPFS setup/clear.
+- Frame capture via `canvas.toBlob` in `renderCanvas`.
+- Mock FFmpeg/WASM processing.
+- Download from OPFS.
 
-Refs are used heavily because many values change every animation frame and should not always trigger React re-renders.
+If you extract export logic, `src/features/export/` is the intended destination.
 
-- `canvasRef`
-  - The `<canvas>` element.
+### `src/vite-env.d.ts`
 
-- `audioSynth`
-  - Holds one `WebAudioSynth` instance for the app lifetime.
+Contains:
 
-- `particlePoolRef`
-  - Holds a `ParticlePool(900)`.
+- Vite and `vite-plugin-pwa` client references.
+- Global app types used across modules:
+  - `ExportState`
+  - `MidiNote`, `MidiData`
+  - `ActiveNoteInfo`
+  - `KeyPosition`, `KeyboardLayout`
+  - MIDI parser internals such as `RawMidiNote`, `TempoEvent`, `OpenMidiNote`
+  - `Voice`
+  - `WorkerMessage`
+  - Web MIDI shims (`MidiMessage`, `MidiInput`, `MidiAccess`, etc.)
+  - `FileSystemDirectoryWithIterators`
+- Global browser interface additions:
+  - `navigator.requestMIDIAccess`
+  - `window.webkitAudioContext`
 
-- `activeNotes`
-  - `Map` of currently held live MIDI notes.
-  - Keys are MIDI note numbers.
-  - Values are `{ color, isLeftHand }`.
-
-- `midiData`
-  - Current demo/uploaded MIDI data.
-  - Shape: `{ notes: Note[], duration: number }`.
-
-- `reqRef`
-  - Current animation frame id.
-
-- `lastTimeRef`
-  - Last `performance.now()` timestamp for frame delta calculation.
-
-- `playbackStartTime`
-  - Wall-clock timestamp offset used to compute playback seconds while playing.
-
-- `pausedTime`
-  - Current paused/seek position in seconds.
-
-- `lastTimeSec`
-  - Previous playback time. Used to detect notes newly crossed this frame and trigger audio once.
-
-- Export refs
-  - `workerRef`: current export worker.
-  - `exportFrameCountRef`: number of captured PNG frames.
-  - `pendingFramesRef`: count of worker frame writes in flight.
-  - `isExportingRef`: whether frame capture is active.
-  - `isCapturingFrameRef`: prevents concurrent `canvas.toBlob` captures.
-
-### Main `App` component state
-
-React state is used for UI-visible values and controls:
-
-- `isPlaying`
-- `isReady`
-- `duration`
-- `currentTime`
-- `midiDevices`
-- `fileName`
-- `fallSpeed`
-- `isMuted`
-- `particlesEnabled`
-- `exportState`
-- `exportMessage`
-- `exportProgress`
-- `errorMessage`
-- `leftColor`
-- `rightColor`
-- `audioEnabled`
+Be careful adding too many globals. If types become feature-specific, consider moving them into exported type modules instead.
 
 ## App Lifecycle
 
@@ -166,19 +302,21 @@ On unmount:
 
 1. Cancel the animation frame.
 2. Terminate any active export worker.
-3. Remove resize listener from the second effect.
+3. Remove resize listener.
 
 ## Playback Flow
 
 ```mermaid
 sequenceDiagram
     participant User
+    participant Toolbar
     participant App
     participant Clock as performance.now clock
     participant Canvas as renderCanvas
     participant Synth as WebAudioSynth
 
-    User->>App: Click Play
+    User->>Toolbar: Click Play
+    Toolbar->>App: onTogglePlay
     App->>Synth: init audio context
     App->>App: set playbackStartTime
     App->>App: set isPlaying true
@@ -204,7 +342,8 @@ Important playback details:
 ```mermaid
 flowchart TD
     Device[MIDI device] --> Message[onmidimessage]
-    Message --> Parse[command, note, velocity]
+    Message --> App[App handleMIDIMessage]
+    App --> Parse[command, note, velocity]
     Parse --> On{Note on?}
     On -->|yes| EnableAudio[handleEnableAudio]
     EnableAudio --> Play[Synth playNote]
@@ -217,15 +356,15 @@ Notes below `HAND_SPLIT_NOTE` use `leftColor`; notes at or above it use `rightCo
 
 ## MIDI File Loading Flow
 
-1. `handleFileUpload` receives a file input change.
-2. `FileReader.readAsArrayBuffer(file)` loads the bytes.
-3. `loadMidiBuffer(buffer, file.name)` calls `parseMIDIArrayBuffer`.
+1. `Toolbar` emits `onFileUpload` when the hidden file input changes.
+2. `App.handleFileUpload` reads the file as an `ArrayBuffer`.
+3. `App.loadMidiBuffer(buffer, file.name)` calls `parseMIDIArrayBuffer` from `src/features/audio/midi.ts`.
 4. Parsed data is assigned to `midiData.current`.
 5. UI state is updated: filename, duration, current time, playback state, readiness.
 
 ## Canvas Rendering Flow
 
-`renderCanvas` is the most performance-sensitive function.
+`renderCanvas` in `App.tsx` is the most performance-sensitive function.
 
 Per frame it:
 
@@ -246,7 +385,8 @@ Per frame it:
 10. Draws white keys, highlighting active notes.
 11. Draws black keys, highlighting active notes.
 12. Captures a PNG frame if `isExportingRef.current` is true.
-13. Calls `requestAnimationFrame(renderCanvas)`.
+
+The effect around `renderCanvas` owns `requestAnimationFrame` scheduling. Avoid making `renderCanvas` schedule itself unless you also revisit hook dependencies carefully.
 
 ### Coordinate Model
 
@@ -274,36 +414,12 @@ if (yBottom > 0 && yTop < hitLineY) {
 }
 ```
 
-## Keyboard Layout
-
-`getLayout(width)` returns `{ positions, whiteKeyWidth, blackKeyWidth }`.
-
-- White keys are assigned first with `width / 52`.
-- Black keys are assigned second relative to the previous white key.
-- Each `positions[midi]` object has:
-
-```ts
-{
-  x: number;
-  width: number;
-  isBlack: boolean;
-}
-```
-
-If you alter the key range or keyboard sizing, update:
-
-- `FIRST_NOTE`
-- `LAST_NOTE`
-- `KEYBOARD_HEIGHT`
-- `getLayout`
-- any README/agent documentation that mentions 88 keys or A0-C8
-
 ## Export Flow
 
 The export flow is a prototype, not a complete production encoder.
 
 1. `startExport()` checks OPFS support.
-2. It creates a Web Worker from the `WORKER_CODE` string.
+2. It creates a Web Worker from the `WORKER_CODE` string in `App.tsx`.
 3. It initializes and clears an OPFS `frames` directory.
 4. It resets playback to `0` and starts playing.
 5. During render, `canvas.toBlob` creates PNG frames and posts them to the worker.
@@ -311,6 +427,7 @@ The export flow is a prototype, not a complete production encoder.
 7. When playback ends, `mockExportViaFFMPEGWASM()` runs.
 8. Current behavior simulates FFmpeg/WASM work and writes a mock/fetched MP4 blob to OPFS as `export.mp4`.
 9. `downloadVideo()` downloads `export.mp4` and attempts to remove `frames`.
+10. `ExportOverlay` displays export UI based on `exportState`.
 
 When working on export:
 
@@ -318,6 +435,7 @@ When working on export:
 - Avoid blocking the main thread while writing many frames.
 - Be explicit in UI/docs if export is mocked vs real.
 - Check browser compatibility; OPFS is not universal.
+- Prefer moving non-UI export utilities into `src/features/export/` if the flow grows.
 
 ## Vite/PWA Notes
 
@@ -345,15 +463,11 @@ If you change PWA behavior, check both `vite.config.ts` and `src/main.tsx`.
 
 ### General
 
-- Keep changes minimal and aligned with the current single-file implementation unless the user asks for a refactor.
-- If refactoring `App.tsx`, split by responsibility:
-  - MIDI parser
-  - Web Audio synth
-  - particle system
-  - canvas renderer/layout
-  - export worker/OPFS utilities
-  - React UI component
-- Preserve behavior before moving code. Refactor in small steps and validate after each step when possible.
+- Keep changes minimal and aligned with the current modular structure.
+- Keep `App.tsx` focused on orchestration, refs/state, browser API flows, and canvas rendering.
+- Put presentational UI in `src/components/`.
+- Put reusable feature logic in `src/features/<domain>/`.
+- Put cross-cutting constants in `src/constants/`.
 - Do not assume Tone.js powers playback; it currently does not.
 - Do not claim real MP4 encoding unless `mockExportViaFFMPEGWASM` has been replaced by a real encoder.
 
@@ -370,6 +484,13 @@ Use React state for values rendered by JSX. Use refs for:
 
 Avoid putting per-frame data into state unless the UI must display it.
 
+### Component boundaries
+
+- Components in `src/components/` should be controlled/presentational when possible.
+- Keep file reading, audio initialization, MIDI access, export, and render-loop mutations in `App.tsx` or feature modules, not in UI components.
+- If a component needs a new action, pass a callback from `App.tsx` rather than importing app state directly.
+- Keep prop types close to components unless they need to be shared broadly.
+
 ### Render loop safety
 
 Be cautious when modifying `renderCanvas`:
@@ -379,6 +500,7 @@ Be cautious when modifying `renderCanvas`:
 - Keep note culling checks before drawing.
 - Keep black key rendering after white key rendering so black keys appear on top.
 - Keep audio trigger logic based on `prevTimeSec`/`timeSec` to avoid replaying notes every frame.
+- Keep helper functions used inside the render loop fast and deterministic.
 
 ### MIDI parser safety
 
@@ -439,8 +561,9 @@ Manual checks worth doing in a browser:
 
 ## Known Implementation Caveats
 
-- `src/App.tsx` is large and mixes rendering, parsing, audio, export, and UI responsibilities.
+- `App.tsx` still owns the render loop and export flow, so it remains a high-risk file despite UI/helper extraction.
 - The MIDI parser is focused on note visualization/playback, not exhaustive MIDI compatibility.
 - Video export currently simulates encoding.
 - Web MIDI and OPFS support varies by browser.
-- `tone` and `@tonejs/midi` are installed but not used by the current `App.tsx` flow.
+- Global app types currently live in `src/vite-env.d.ts`; consider extracting shared types into dedicated modules if they grow.
+- `tone` and `@tonejs/midi` are installed but not used by the current app flow.
