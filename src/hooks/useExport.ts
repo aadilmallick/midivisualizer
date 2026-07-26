@@ -1,60 +1,27 @@
 import { useCallback, useState } from "react";
 import { getErrorMessage } from "../utils/error";
-
-interface VideoExporter {
-  exportVideo: (fileUri: string) => Promise<Blob>;
-}
-
-const mockVideoExporter: VideoExporter = {
-  exportVideo: async () => {
-    let videoBlob: Blob;
-    try {
-      const response = await fetch(
-        "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/1080/Big_Buck_Bunny_1080_10s_1MB.mp4",
-      );
-      if (!response.ok) throw new Error("Network error");
-      videoBlob = await response.blob();
-    } catch (error) {
-      console.warn(
-        "Fallback mock video generated due to network restrictions:",
-        error,
-      );
-      videoBlob = new Blob(["mock mp4 video content"], { type: "video/mp4" });
-    }
-    return videoBlob;
-  },
-};
-
-const type: "mock" | "real" = "mock";
-
-const exportConfig = {
-  type,
-  directory: "frames",
-  getFileName: () => "export.mp4",
-};
+import { FfmpegVideoExporter } from "../features/export/FFMPEGVideoExporter";
 
 export const downloadVideoFromOPFS = async (fileName?: string) => {
   try {
     const root = await navigator.storage.getDirectory();
-    const videoFh = await root.getFileHandle(exportConfig.getFileName());
+    const videoFh = await root.getFileHandle("export.mp4");
     const file = await videoFh.getFile();
     const url = URL.createObjectURL(file);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${fileName ? fileName.replace(/\.[^/.]+$/, "") : "flowkeys"}_${exportConfig.getFileName()}`;
+    a.download = `${fileName ? fileName.replace(/\.[^/.]+$/, "") : "flowkeys"}_export.mp4`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
 
     await root
-      .removeEntry(exportConfig.directory, { recursive: true })
+      .removeEntry("frames", { recursive: true })
       .catch(() => undefined);
-    // setExportState("idle");
     return true;
   } catch (error) {
     console.error("Download error:", error);
-    // setErrorMessage("Failed to download video from OPFS storage.");
     return false;
   }
 };
@@ -68,8 +35,32 @@ export const useExport = () => {
   const exportViaFFMPEGWASM = useCallback(async () => {
     try {
       setExportState("processing");
-      setExportMessage("Reading frames from OPFS storage...");
+      setExportMessage(
+        "Initializing FFmpeg WASM (loads ~31MB core on first run)...",
+      );
 
+      // 1. Initialize or get the Singleton FFmpeg Instance
+      const exporter = await FfmpegVideoExporter.load(
+        (message) => {
+          // FFmpeg WASM logs "Aborted()" when its virtual process exits, even
+          // after successful encodes. We check the actual exec exit code in the
+          // exporter, so suppress this noisy lifecycle message here.
+          if (message.trim() !== "Aborted()") {
+            console.log("[FFmpeg LOG]", message);
+          }
+        },
+        (progress) => {
+          // Map FFmpeg progress (0.0 - 1.0) to UI progress (40% - 90%)
+          // Leaving 0-40% for loading/traversing, and 90-100% for saving
+          setExportProgress(40 + progress * 50);
+          setExportMessage(`Encoding video... ${Math.round(progress * 100)}%`);
+        },
+      );
+
+      setExportMessage("Reading frames from OPFS storage...");
+      setExportProgress(10);
+
+      // 2. Traverse OPFS for UI feedback
       const root = await navigator.storage.getDirectory();
       const framesDir = (await root.getDirectoryHandle(
         "frames",
@@ -84,29 +75,17 @@ export const useExport = () => {
       frameNames.sort();
 
       setExportMessage(
-        `Traversed ${frameNames.length} image frames in OPFS. Simulating FFmpeg WASM compilation...`,
+        `Found ${frameNames.length} frames. Writing to FFmpeg memory...`,
       );
-      setExportProgress(30);
+      setExportProgress(20);
 
-      await new Promise((resolve) => setTimeout(resolve, 800));
-      setExportProgress(65);
-      setExportMessage("Concatenating PNG frames & encoding video codec...");
-
-      let videoBlob: Blob;
-      if (type === "mock") {
-        videoBlob = await mockVideoExporter.exportVideo(
-          "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/1080/Big_Buck_Bunny_1080_10s_1MB.mp4",
-        );
-      } else {
-        // TODO: fill in later, but for now, use the mock video
-        videoBlob = await mockVideoExporter.exportVideo(
-          "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/1080/Big_Buck_Bunny_1080_10s_1MB.mp4",
-        );
-      }
+      // 3. Process frames and get MP4 blob
+      const videoBlob = await exporter.exportVideo("frames");
 
       setExportProgress(90);
-      setExportMessage("Saving video to OPFS storage...");
+      setExportMessage("Saving compiled video to OPFS storage...");
 
+      // 4. Save back to OPFS
       const videoFh = await root.getFileHandle("export.mp4", { create: true });
       const writable = await videoFh.createWritable();
       await writable.write(videoBlob);

@@ -180,11 +180,25 @@ const App = () => {
         currentTimeRef.current = duration;
         setCurrentTime(duration);
 
-        // voids the export once the song is done
+        // Start encoding after all async canvas.toBlob frame writes have landed
+        // in OPFS. Without this wait, FFmpeg can race the worker and encode an
+        // incomplete image sequence.
         if (isExportingRef.current) {
           isExportingRef.current = false;
           window.setTimeout(() => {
-            void exportViaFFMPEGWASMRef.current();
+            const waitForFrameWrites = async () => {
+              const start = performance.now();
+              while (
+                (pendingFramesRef.current > 0 || isCapturingFrameRef.current) &&
+                performance.now() - start < 10000
+              ) {
+                await new Promise((resolve) => window.setTimeout(resolve, 50));
+              }
+
+              await exportViaFFMPEGWASMRef.current();
+            };
+
+            void waitForFrameWrites();
           }, 300);
         }
       }

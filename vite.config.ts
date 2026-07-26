@@ -28,25 +28,13 @@ const pwaPlugin = VitePWA({
     categories: ["music", "entertainment", "education"],
   },
   workbox: {
+    // 1. This handles your local npm packages (@ffmpeg/ffmpeg, @ffmpeg/util)
+    // because Vite bundles them into .js files.
     globPatterns: ["**/*.{js,css,html,svg,png,ico,txt,woff2}"],
+
     runtimeCaching: [
-      // {
-      //   // Cache the @tonejs/midi library from CDN
-      //   urlPattern: /^https:\/\/unpkg\.com\/.*/i,
-      //   handler: "CacheFirst",
-      //   options: {
-      //     cacheName: "cdn-cache",
-      //     expiration: {
-      //       maxEntries: 10,
-      //       maxAgeSeconds: 60 * 60 * 24 * 365, // 1 year
-      //     },
-      //     cacheableResponse: {
-      //       statuses: [0, 200],
-      //     },
-      //   },
-      // },
       {
-        // Cache Web MIDI API related requests
+        // Cache Web MIDI API related requests (Fonts)
         urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
         handler: "CacheFirst",
         options: {
@@ -60,8 +48,24 @@ const pwaPlugin = VitePWA({
           },
         },
       },
+      {
+        // 2. Cache the heavy @ffmpeg/core files loaded by toBlobURL()
+        // We use a flexible regex so it caches any minor version of 0.12.x
+        urlPattern:
+          /^https:\/\/cdn\.jsdelivr\.net\/npm\/@ffmpeg\/core@0\.12\.\d+\/dist\/esm\/.*/i,
+        handler: "CacheFirst",
+        options: {
+          cacheName: "ffmpeg-core-esm-cache",
+          expiration: {
+            maxEntries: 10, // Keep a few versions in case of hotfixes
+            maxAgeSeconds: 60 * 60 * 24 * 90, // 90 days
+          },
+          cacheableResponse: {
+            statuses: [0, 200],
+          },
+        },
+      },
     ],
-    // Cache all navigation requests
     navigateFallback: null,
   },
   devOptions: {
@@ -72,4 +76,15 @@ const pwaPlugin = VitePWA({
 
 export default defineConfig({
   plugins: [react(), tailwindcss(), pwaPlugin],
+  server: {
+    headers: {
+      // Required for SharedArrayBuffer (which Emscripten relies on)
+      "Cross-Origin-Opener-Policy": "same-origin",
+      "Cross-Origin-Embedder-Policy": "require-corp",
+    },
+  },
+  optimizeDeps: {
+    // Prevents Vite from breaking FFmpeg's worker thread
+    exclude: ["@ffmpeg/ffmpeg", "@ffmpeg/util"],
+  },
 });
