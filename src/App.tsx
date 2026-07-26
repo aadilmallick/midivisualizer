@@ -81,7 +81,9 @@ const App = () => {
   const rightSparkColorsRef = useRef(getSparkColors("#FFD700"));
   const particlesEnabledRef = useRef(true);
   const durationRef = useRef(0);
-  // const mockExportRef = useRef<() => Promise<void>>(async () => undefined);
+  const exportViaFFMPEGWASMRef = useRef<() => Promise<void>>(
+    async () => undefined,
+  );
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [isReady, setIsReady] = useState(false);
@@ -111,6 +113,10 @@ const App = () => {
     audioSynth.current.init();
     setAudioEnabled(true);
   }, []);
+
+  useEffect(() => {
+    exportViaFFMPEGWASMRef.current = exportViaFFMPEGWASM;
+  }, [exportViaFFMPEGWASM]);
 
   useEffect(() => {
     isPlayingRef.current = isPlaying;
@@ -174,10 +180,11 @@ const App = () => {
         currentTimeRef.current = duration;
         setCurrentTime(duration);
 
+        // voids the export once the song is done
         if (isExportingRef.current) {
           isExportingRef.current = false;
           window.setTimeout(() => {
-            void exportViaFFMPEGWASM();
+            void exportViaFFMPEGWASMRef.current();
           }, 300);
         }
       }
@@ -356,6 +363,7 @@ const App = () => {
       }
     }
 
+    // TODO: refactor to go into useExport hook
     if (
       isExportingRef.current &&
       workerRef.current &&
@@ -436,6 +444,7 @@ const App = () => {
     setIsReady(true);
   }, []);
 
+  // TODO: refactor these methods into its own useMidi.ts hook
   const handleMIDIMessage = useCallback(
     (message: MidiMessage) => {
       const [command, note, velocity] = message.data;
@@ -483,25 +492,28 @@ const App = () => {
     console.warn("Web MIDI API is not accessible.");
   }, []);
 
-  const loadMidiBuffer = useCallback((buffer: ArrayBuffer, name: string) => {
-    try {
-      const parsed = parseMIDIArrayBuffer(buffer);
-      midiData.current = parsed;
-      setFileName(name);
-      setDuration(parsed.duration);
-      durationRef.current = parsed.duration;
-      setCurrentTime(0);
-      currentTimeRef.current = 0;
-      pausedTime.current = 0;
-      lastTimeSec.current = 0;
-      isPlayingRef.current = false;
-      setIsPlaying(false);
-      setIsReady(true);
-    } catch (error) {
-      console.error("Failed to parse MIDI file", error);
-      setErrorMessage(`Failed to parse MIDI file: ${getErrorMessage(error)}`);
-    }
-  }, []);
+  const loadMidiBuffer = useCallback(
+    (buffer: ArrayBuffer, name: string) => {
+      try {
+        const parsed = parseMIDIArrayBuffer(buffer);
+        midiData.current = parsed;
+        setFileName(name);
+        setDuration(parsed.duration);
+        durationRef.current = parsed.duration;
+        setCurrentTime(0);
+        currentTimeRef.current = 0;
+        pausedTime.current = 0;
+        lastTimeSec.current = 0;
+        isPlayingRef.current = false;
+        setIsPlaying(false);
+        setIsReady(true);
+      } catch (error) {
+        console.error("Failed to parse MIDI file", error);
+        setErrorMessage(`Failed to parse MIDI file: ${getErrorMessage(error)}`);
+      }
+    },
+    [setErrorMessage],
+  );
 
   const handleFileUpload = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -520,6 +532,10 @@ const App = () => {
     [loadMidiBuffer],
   );
 
+  /**
+   * TODO: refactor this to include export ref and filehandler ref and worker code
+   * all in the useExport hook, refactor the state in that to use useReducer as well.
+   */
   const startExport = useCallback(async () => {
     try {
       setErrorMessage("");
@@ -603,8 +619,15 @@ const App = () => {
       setExportState("idle");
       isExportingRef.current = false;
     }
-  }, [audioEnabled, handleEnableAudio]);
+  }, [
+    audioEnabled,
+    handleEnableAudio,
+    setErrorMessage,
+    setExportMessage,
+    setExportState,
+  ]);
 
+  // TODO: refactor this to come straight from the useExport hook, with useReducer
   const downloadVideo = useCallback(async () => {
     const downloadSuccess = await downloadVideoFromOPFS(fileName);
     if (downloadSuccess) {
@@ -612,7 +635,7 @@ const App = () => {
     } else {
       setErrorMessage("Failed to download video from OPFS storage.");
     }
-  }, [fileName]);
+  }, [fileName, setErrorMessage, setExportState]);
 
   const togglePlay = useCallback(() => {
     handleEnableAudio();

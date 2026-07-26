@@ -14,8 +14,8 @@ export class Particle {
     this.active = true;
     this.x = x;
     this.y = y;
-    this.vx = (Math.random() - 0.5) * 4.0;
-    this.vy = -(Math.random() * 4.5 + 2.0);
+    this.vx = (Math.random() - 0.5) * 240;
+    this.vy = -(Math.random() * 270 + 120);
     this.size = Math.random() * 3.5 + 1.5;
     this.color = color;
     this.alpha = 1;
@@ -30,24 +30,20 @@ export class Particle {
       this.active = false;
       return;
     }
-    this.x += this.vx;
-    this.y += this.vy;
-    this.vy += 3.5 * dt;
+    this.x += this.vx * dt;
+    this.y += this.vy * dt;
+    this.vy += 210 * dt;
     const progress = this.life / this.maxLife;
     this.alpha = 1 - progress;
   }
 
   draw(ctx: CanvasRenderingContext2D) {
     if (!this.active) return;
-    ctx.save();
     ctx.globalAlpha = this.alpha;
     ctx.fillStyle = this.color;
-    ctx.shadowColor = this.color;
-    ctx.shadowBlur = 8;
     ctx.beginPath();
     ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
     ctx.fill();
-    ctx.restore();
   }
 }
 
