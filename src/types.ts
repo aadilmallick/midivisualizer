@@ -1,4 +1,5 @@
 export interface VideoExportOptions {
+  audioBlob?: Blob;
   durationSeconds?: number;
 }
 

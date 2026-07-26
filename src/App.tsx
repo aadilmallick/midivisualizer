@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { WebAudioSynth } from "./features/audio/WebAudioSynth";
 import { ParticlePool } from "./features/canvas/Particles";
 import { pianoConstants } from "./utils/layout";
 import {
@@ -18,6 +17,7 @@ import { getErrorMessage } from "./utils/error";
 import { downloadVideoFromOPFS, useExport } from "./hooks/useExport";
 import { exportConfig } from "./features/export/FFMPEGVideoExporter";
 import { ToneAudioEngine } from "./features/audio/ToneAudioEngine";
+import { renderMidiToWavBlob } from "./features/audio/renderToneMidiAudio";
 /**
  * Worker Code String for high-throughput OPFS frame writing.
  */
@@ -87,8 +87,9 @@ const App = () => {
   const particlesEnabledRef = useRef(true);
   const durationRef = useRef(0);
   const exportViaFFMPEGWASMRef = useRef<
-    (durationSeconds?: number) => Promise<void>
+    (durationSeconds?: number, audioBlob?: Blob) => Promise<void>
   >(async () => undefined);
+  const includeAudioInExportRef = useRef(true);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [isReady, setIsReady] = useState(false);
@@ -102,6 +103,7 @@ const App = () => {
   const [leftColor, setLeftColor] = useState("#FF6F00");
   const [rightColor, setRightColor] = useState("#FFD700");
   const [audioEnabled, setAudioEnabled] = useState(false);
+  const [includeAudioInExport, setIncludeAudioInExport] = useState(true);
 
   // Virtual Instrument State
   const [isPianoLoaded, setIsPianoLoaded] = useState(false);
@@ -156,6 +158,10 @@ const App = () => {
     durationRef.current = duration;
   }, [duration]);
 
+  useEffect(() => {
+    includeAudioInExportRef.current = includeAudioInExport;
+  }, [includeAudioInExport]);
+
   const renderCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -197,15 +203,37 @@ const App = () => {
           isExportingRef.current = false;
           window.setTimeout(() => {
             const waitForFrameWrites = async () => {
-              const start = performance.now();
-              while (
-                (pendingFramesRef.current > 0 || isCapturingFrameRef.current) &&
-                performance.now() - start < 10000
-              ) {
-                await new Promise((resolve) => window.setTimeout(resolve, 50));
-              }
+              try {
+                const start = performance.now();
+                while (
+                  (pendingFramesRef.current > 0 ||
+                    isCapturingFrameRef.current) &&
+                  performance.now() - start < 10000
+                ) {
+                  await new Promise((resolve) =>
+                    window.setTimeout(resolve, 50),
+                  );
+                }
 
-              await exportViaFFMPEGWASMRef.current(durationRef.current);
+                let audioBlob: Blob | undefined;
+
+                if (includeAudioInExportRef.current && midiData.current) {
+                  setExportMessage("Rendering grand piano audio track...");
+                  audioBlob = await renderMidiToWavBlob(
+                    midiData.current,
+                    durationRef.current,
+                  );
+                }
+
+                await exportViaFFMPEGWASMRef.current(
+                  durationRef.current,
+                  audioBlob,
+                );
+              } catch (error) {
+                console.error("Export finalization failed:", error);
+                setErrorMessage(`Export failed: ${getErrorMessage(error)}`);
+                setExportState("idle");
+              }
             };
 
             void waitForFrameWrites();
@@ -410,7 +438,7 @@ const App = () => {
         isCapturingFrameRef.current = false;
       }, `image/${exportConfig.frameExtension}`);
     }
-  }, []);
+  }, [setErrorMessage, setExportMessage, setExportState]);
 
   // TODO: refactor this, put in features/audio/demosong.ts
   const loadDemoSong = useCallback(() => {
@@ -760,6 +788,7 @@ const App = () => {
         duration={duration}
         exportState={exportState}
         fallSpeed={fallSpeed}
+        includeAudioInExport={includeAudioInExport}
         isMuted={isMuted}
         isPlaying={isPlaying}
         isReady={isReady}
@@ -767,6 +796,7 @@ const App = () => {
         particlesEnabled={particlesEnabled}
         onFallSpeedChange={setFallSpeed}
         onFileUpload={handleFileUpload}
+        onIncludeAudioInExportChange={setIncludeAudioInExport}
         onSeek={handleSeek}
         onStartExport={startExport}
         onToggleMute={toggleMute}

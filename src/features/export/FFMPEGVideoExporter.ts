@@ -110,6 +110,14 @@ export class FfmpegVideoExporter implements VideoExporter {
       await this.ffmpeg.writeFile(name, await fetchFile(file));
     }
 
+    const audioInputName = options.audioBlob ? "audio.wav" : null;
+    if (audioInputName && options.audioBlob) {
+      await this.ffmpeg.writeFile(
+        audioInputName,
+        await fetchFile(options.audioBlob),
+      );
+    }
+
     const inputFrameRate =
       options.durationSeconds && options.durationSeconds > 0
         ? frameNames.length / options.durationSeconds
@@ -123,11 +131,18 @@ export class FfmpegVideoExporter implements VideoExporter {
     // -preset ultrafast: Crucial for WASM to prevent browser timeouts on long videos
     // -vf scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p:
     //   H.264/yuv420p requires even dimensions. Canvas heights can be odd.
-    const exitCode = await this.ffmpeg.exec([
+    const command = [
       "-framerate",
       inputFrameRate.toFixed(3),
       "-i",
       `frame_%05d.${exportConfig.frameExtension}`,
+    ];
+
+    if (audioInputName) {
+      command.push("-i", audioInputName);
+    }
+
+    command.push(
       "-vf",
       "scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p",
       "-c:v",
@@ -136,10 +151,15 @@ export class FfmpegVideoExporter implements VideoExporter {
       "ultrafast",
       "-crf",
       "23",
-      "-movflags",
-      "+faststart",
-      "output.mp4",
-    ]);
+    );
+
+    if (audioInputName) {
+      command.push("-c:a", "aac", "-b:a", "192k", "-shortest");
+    }
+
+    command.push("-movflags", "+faststart", "output.mp4");
+
+    const exitCode = await this.ffmpeg.exec(command);
 
     if (exitCode !== 0) {
       throw new Error(`FFmpeg encoding failed with exit code ${exitCode}.`);
@@ -159,6 +179,9 @@ export class FfmpegVideoExporter implements VideoExporter {
     // 4. Cleanup virtual file system to free up RAM
     for (const name of frameNames) {
       await this.ffmpeg.deleteFile(name);
+    }
+    if (audioInputName) {
+      await this.ffmpeg.deleteFile(audioInputName);
     }
     await this.ffmpeg.deleteFile("output.mp4");
 

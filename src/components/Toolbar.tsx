@@ -17,6 +17,7 @@ interface ToolbarProps {
   duration: number;
   exportState: ExportState;
   fallSpeed: number;
+  includeAudioInExport: boolean;
   isMuted: boolean;
   isPlaying: boolean;
   isReady: boolean;
@@ -24,6 +25,7 @@ interface ToolbarProps {
   particlesEnabled: boolean;
   onFallSpeedChange: (speed: number) => void;
   onFileUpload: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  onIncludeAudioInExportChange: (include: boolean) => void;
   onSeek: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onStartExport: () => void;
   onToggleMute: () => void;
@@ -37,6 +39,7 @@ export const Toolbar = ({
   duration,
   exportState,
   fallSpeed,
+  includeAudioInExport,
   isMuted,
   isPlaying,
   isReady,
@@ -44,6 +47,7 @@ export const Toolbar = ({
   particlesEnabled,
   onFallSpeedChange,
   onFileUpload,
+  onIncludeAudioInExportChange,
   onSeek,
   onStartExport,
   onToggleMute,
@@ -161,6 +165,24 @@ export const Toolbar = ({
           onChange={onFileUpload}
           className="hidden"
         />
+      </label>
+
+      <label
+        title="Include piano audio in exported MP4"
+        className={`hidden xl:flex items-center gap-2 px-3 py-2 bg-slate-800/60 border border-slate-700/50 rounded-xl text-xs font-semibold text-slate-300 ${
+          exportState !== "idle" ? "opacity-60" : "cursor-pointer"
+        }`}
+      >
+        <input
+          type="checkbox"
+          checked={includeAudioInExport}
+          disabled={exportState !== "idle"}
+          onChange={(event) =>
+            onIncludeAudioInExportChange(event.target.checked)
+          }
+          className="accent-amber-400"
+        />
+        <span>Audio</span>
       </label>
 
       <button
