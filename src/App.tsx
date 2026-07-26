@@ -85,9 +85,9 @@ const App = () => {
   const rightSparkColorsRef = useRef(getSparkColors("#FFD700"));
   const particlesEnabledRef = useRef(true);
   const durationRef = useRef(0);
-  const exportViaFFMPEGWASMRef = useRef<() => Promise<void>>(
-    async () => undefined,
-  );
+  const exportViaFFMPEGWASMRef = useRef<
+    (durationSeconds?: number) => Promise<void>
+  >(async () => undefined);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [isReady, setIsReady] = useState(false);
@@ -199,7 +199,7 @@ const App = () => {
                 await new Promise((resolve) => window.setTimeout(resolve, 50));
               }
 
-              await exportViaFFMPEGWASMRef.current();
+              await exportViaFFMPEGWASMRef.current(durationRef.current);
             };
 
             void waitForFrameWrites();

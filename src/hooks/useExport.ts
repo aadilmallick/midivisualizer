@@ -37,7 +37,7 @@ export const useExport = () => {
   const [exportProgress, setExportProgress] = useState(0);
   const [errorMessage, setErrorMessage] = useState("");
 
-  const exportViaFFMPEGWASM = useCallback(async () => {
+  const exportViaFFMPEGWASM = useCallback(async (durationSeconds?: number) => {
     try {
       setExportState("processing");
       setExportMessage(
@@ -79,13 +79,22 @@ export const useExport = () => {
       }
       frameNames.sort();
 
+      const inputFrameRate =
+        durationSeconds && durationSeconds > 0
+          ? frameNames.length / durationSeconds
+          : exportConfig.fps;
+
       setExportMessage(
-        `Found ${frameNames.length} frames. Writing to FFmpeg memory...`,
+        `Found ${frameNames.length} frames. Encoding at ${inputFrameRate.toFixed(
+          2,
+        )} fps to match source duration...`,
       );
       setExportProgress(20);
 
       // 3. Process frames and get MP4 blob
-      const videoBlob = await exporter.exportVideo(exportConfig.directory);
+      const videoBlob = await exporter.exportVideo(exportConfig.directory, {
+        durationSeconds,
+      });
 
       setExportProgress(90);
       setExportMessage("Saving compiled video to OPFS storage...");

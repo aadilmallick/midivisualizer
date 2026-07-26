@@ -1,6 +1,6 @@
 import { FFmpeg } from "@ffmpeg/ffmpeg";
 import { fetchFile, toBlobURL } from "@ffmpeg/util";
-import type { VideoExporter } from "../../types";
+import type { VideoExportOptions, VideoExporter } from "../../types";
 
 export const exportConfig = {
   fps: 30,
@@ -74,7 +74,10 @@ export class FfmpegVideoExporter implements VideoExporter {
     return instance;
   }
 
-  public async exportVideo(fileUri: string): Promise<Blob> {
+  public async exportVideo(
+    fileUri: string,
+    options: VideoExportOptions = {},
+  ): Promise<Blob> {
     if (!this.loaded) {
       throw new Error(
         "FFmpeg is not loaded. Call FfmpegVideoExporter.load() first.",
@@ -107,15 +110,22 @@ export class FfmpegVideoExporter implements VideoExporter {
       await this.ffmpeg.writeFile(name, await fetchFile(file));
     }
 
+    const inputFrameRate =
+      options.durationSeconds && options.durationSeconds > 0
+        ? frameNames.length / options.durationSeconds
+        : exportConfig.fps;
+
     // 2. Execute FFmpeg command
-    // -framerate 30: Assumes you captured at 30fps
+    // -framerate: Tells FFmpeg how much presentation time each captured PNG
+    //   represents. It is derived from captured frames / song duration because
+    //   canvas.toBlob/OPFS writes can miss the nominal capture FPS on slower runs.
     // -i frame_%05d.png: Matches your padStart(5, '0') naming convention
     // -preset ultrafast: Crucial for WASM to prevent browser timeouts on long videos
     // -vf scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p:
     //   H.264/yuv420p requires even dimensions. Canvas heights can be odd.
     const exitCode = await this.ffmpeg.exec([
       "-framerate",
-      `${exportConfig.fps}`,
+      inputFrameRate.toFixed(3),
       "-i",
       `frame_%05d.${exportConfig.frameExtension}`,
       "-vf",
