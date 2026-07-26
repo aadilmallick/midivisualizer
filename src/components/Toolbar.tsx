@@ -1,5 +1,6 @@
 import {
   Film,
+  Layers,
   Music,
   Pause,
   Play,
@@ -28,6 +29,7 @@ interface ToolbarProps {
   onToggleMute: () => void;
   onToggleParticles: () => void;
   onTogglePlay: () => void;
+  isPianoLoaded: boolean;
 }
 
 export const Toolbar = ({
@@ -47,6 +49,7 @@ export const Toolbar = ({
   onToggleMute,
   onToggleParticles,
   onTogglePlay,
+  isPianoLoaded,
 }: ToolbarProps) => (
   <header className="h-20 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 px-6 flex items-center justify-between z-20 shadow-xl">
     <div className="flex items-center gap-4">
@@ -68,6 +71,23 @@ export const Toolbar = ({
           </div>
         </div>
       </div>
+    </div>
+
+    {/* Virtual Instrument Indicator */}
+    <div className="hidden md:flex items-center gap-2 bg-slate-800/80 px-3 py-1.5 rounded-xl border border-slate-700/60 shadow-inner">
+      <Layers className="w-4 h-4 text-amber-400" />
+      <span className="text-xs font-semibold text-slate-300">
+        Concert Grand Piano
+      </span>
+      <span
+        className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+          isPianoLoaded
+            ? "bg-emerald-500/20 text-emerald-400"
+            : "bg-amber-500/20 text-amber-400 animate-pulse"
+        }`}
+      >
+        {isPianoLoaded ? "HD Samples Ready" : "Loading Samples..."}
+      </span>
     </div>
 
     <div className="flex-1 max-w-2xl mx-8 flex items-center gap-4">
@@ -125,9 +145,11 @@ export const Toolbar = ({
             : "bg-red-500/10 border-red-500/40 text-red-400"
         }`}
       >
-        {isMuted
-          ? <VolumeX className="w-5 h-5" />
-          : <Volume2 className="w-5 h-5" />}
+        {isMuted ? (
+          <VolumeX className="w-5 h-5" />
+        ) : (
+          <Volume2 className="w-5 h-5" />
+        )}
       </button>
 
       <label className="flex items-center gap-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-700/80 border border-slate-700 rounded-xl cursor-pointer transition-all text-sm font-semibold text-slate-200 shadow-md">
@@ -164,19 +186,17 @@ export const Toolbar = ({
             : "bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-emerald-500/25"
         } ${!isReady ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
       >
-        {isPlaying
-          ? (
-            <>
-              <Pause className="w-4 h-4 fill-slate-950" />
-              <span>Pause</span>
-            </>
-          )
-          : (
-            <>
-              <Play className="w-4 h-4 fill-slate-950" />
-              <span>Play</span>
-            </>
-          )}
+        {isPlaying ? (
+          <>
+            <Pause className="w-4 h-4 fill-slate-950" />
+            <span>Pause</span>
+          </>
+        ) : (
+          <>
+            <Play className="w-4 h-4 fill-slate-950" />
+            <span>Play</span>
+          </>
+        )}
       </button>
     </div>
   </header>

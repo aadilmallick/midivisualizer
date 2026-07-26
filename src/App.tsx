@@ -17,6 +17,7 @@ import { HandBadge } from "./components/HandBadge";
 import { getErrorMessage } from "./utils/error";
 import { downloadVideoFromOPFS, useExport } from "./hooks/useExport";
 import { exportConfig } from "./features/export/FFMPEGVideoExporter";
+import { ToneAudioEngine } from "./features/audio/ToneAudioEngine";
 /**
  * Worker Code String for high-throughput OPFS frame writing.
  */
@@ -55,7 +56,7 @@ const EXPORT_FRAME_INTERVAL_MS = exportConfig.frameIntervalMs;
 
 const App = () => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const audioSynth = useRef(new WebAudioSynth());
+  const audioSynth = useRef(new ToneAudioEngine());
   const particlePoolRef = useRef(new ParticlePool(900));
   const activeNotes = useRef(new Map<number, ActiveNoteInfo>());
   const midiData = useRef<MidiData | null>(null);
@@ -102,6 +103,9 @@ const App = () => {
   const [rightColor, setRightColor] = useState("#FFD700");
   const [audioEnabled, setAudioEnabled] = useState(false);
 
+  // Virtual Instrument State
+  const [isPianoLoaded, setIsPianoLoaded] = useState(false);
+
   const {
     exportState,
     exportMessage,
@@ -114,7 +118,9 @@ const App = () => {
   } = useExport();
 
   const handleEnableAudio = useCallback(() => {
-    audioSynth.current.init();
+    audioSynth.current.init(() => {
+      setIsPianoLoaded(true);
+    });
     setAudioEnabled(true);
   }, []);
 
@@ -766,6 +772,7 @@ const App = () => {
         onToggleMute={toggleMute}
         onToggleParticles={toggleParticles}
         onTogglePlay={togglePlay}
+        isPianoLoaded={isPianoLoaded}
       />
 
       <ErrorMessageBanner

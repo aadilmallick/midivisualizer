@@ -65,6 +65,23 @@ const pwaPlugin = VitePWA({
           },
         },
       },
+      //cache this: "https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"
+      //
+      {
+        urlPattern:
+          /^https:\/\/cdnjs\.cloudflare\.com\/ajax\/libs\/tone\/14\.8\.49\/Tone\.js/i,
+        handler: "CacheFirst",
+        options: {
+          cacheName: "tonejs-cache",
+          expiration: {
+            maxEntries: 1,
+            maxAgeSeconds: 60 * 60 * 24 * 365, // 1 year
+          },
+          cacheableResponse: {
+            statuses: [0, 200],
+          },
+        },
+      },
     ],
     navigateFallback: null,
   },
