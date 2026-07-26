@@ -1,9 +1,9 @@
 # FlowKeys 🎹
 
-FlowKeys is a browser-based MIDI visualizer built with React, Vite, Tailwind
-CSS, Canvas, Web MIDI, and Web Audio. It displays an 88-key piano with falling
-note bars, live MIDI input highlighting, hand-colored notes, particle sparks,
-and an experimental OPFS-backed video export flow.
+FlowKeys is a browser-based MIDI visualizer built with React, Vite, TypeScript,
+Tailwind CSS, Canvas 2D, Web MIDI, Web Audio, OPFS, and FFmpeg WASM. It displays
+an 88-key piano with falling note bars, live MIDI highlighting, hand-colored
+notes, particle sparks, and MP4 video export.
 
 ![status](https://img.shields.io/badge/status-active-success)
 ![React](https://img.shields.io/badge/React-19.2.0-blue)
@@ -14,16 +14,14 @@ and an experimental OPFS-backed video export flow.
 ## Features
 
 - 🎹 **88-key piano visualization** from A0 (`21`) to C8 (`108`)
-- 🎵 **MIDI file playback** via a built-in MIDI parser in `src/App.tsx`
+- 🎵 **MIDI file playback** with a built-in MIDI parser
 - 🎛️ **Live Web MIDI input** for connected keyboards/controllers
-- 🔊 **Web Audio synthesis** with lightweight oscillator voices
-- 🌈 **Separate left/right hand colors** using Middle C (`60`) as the split
-  point
-- ✨ **Particle spark effects** with object pooling for smoother rendering
-- ⏯️ **Playback controls** for play/pause, seeking, speed, mute, and upload
-- 🎬 **Experimental video export** that captures PNG frames to OPFS and
-  simulates MP4 encoding
-- 📱 **PWA configuration** through `vite-plugin-pwa`
+- 🔊 **Custom Web Audio synthesis** with lightweight oscillator voices
+- 🌈 **Separate left/right hand colors** using Middle C (`60`) as the split point
+- ✨ **Particle spark effects** with object pooling and frame-rate independent motion
+- ⏯️ **Playback controls** for play/pause, seeking, speed, mute, particles, and upload
+- 🎬 **MP4 video export** using Canvas PNG frame capture, OPFS, a Web Worker, and FFmpeg WASM
+- 📱 **PWA setup** through `vite-plugin-pwa`
 
 ## Tech Stack
 
@@ -32,30 +30,54 @@ and an experimental OPFS-backed video export flow.
 - **Tailwind CSS 4** through `@tailwindcss/vite`
 - **Canvas 2D API** for all visualization rendering
 - **Web MIDI API** for hardware MIDI input
-- **Web Audio API** for synthesized playback/free-play audio
-- **OPFS** (`navigator.storage.getDirectory`) and a Web Worker for export frame
-  storage
-- **vite-plugin-pwa** for app manifest/service-worker generation
+- **Web Audio API** for synthesized playback and live input audio
+- **OPFS** (`navigator.storage.getDirectory`) for captured frames and exported video
+- **Web Worker** for writing PNG frames without blocking the render loop
+- **@ffmpeg/ffmpeg + @ffmpeg/util** for browser-side MP4 encoding
+- **vite-plugin-pwa** for manifest/service-worker generation
 - **Lucide React** for UI icons
-
-> Note: `tone` and `@tonejs/midi` are currently listed in `package.json`, but
-> the current `App.tsx` implementation uses its own MIDI parser and a custom
-> `WebAudioSynth` class instead of Tone.js.
 
 ## Project Structure
 
 ```text
 midivisualizer/
-├── public/                 # Static assets referenced by the PWA manifest
+├── public/                         Static assets referenced by the app/PWA
 ├── src/
-│   ├── App.tsx             # Main app, parser, synth, canvas renderer, export flow
-│   ├── index.css           # Tailwind CSS import
-│   └── main.tsx            # React entry point + PWA service worker registration
-├── index.html              # Vite HTML entry point
-├── package.json            # Scripts and dependencies
-├── tsconfig*.json          # TypeScript configuration
-├── vite.config.ts          # React/Tailwind/PWA Vite config
-└── AGENTS.md               # Codebase guide for AI agents and maintainers
+│   ├── App.tsx                     Main coordinator: state, refs, MIDI wiring, render loop, export capture
+│   ├── App.css                     App stylesheet if used by future UI work
+│   ├── index.css                   Tailwind CSS import
+│   ├── main.tsx                    React entry point + PWA service worker registration
+│   ├── types.ts                    Export-related shared TypeScript interfaces
+│   ├── vite-env.d.ts               Vite/PWA refs plus app/browser global type shims
+│   ├── assets/
+│   │   └── react.svg
+│   ├── components/
+│   │   ├── EnableAudioBanner.tsx   Audio autoplay prompt
+│   │   ├── ErrorMessageBanner.tsx  Dismissible error banner
+│   │   ├── ExportOverlay.tsx       Recording/processing/ready export modal
+│   │   ├── HandBadge.tsx           Left/right color pickers + current file name
+│   │   └── Toolbar.tsx             Header controls and timeline
+│   ├── features/
+│   │   ├── audio/
+│   │   │   ├── WebAudioSynth.ts    Custom oscillator-based Web Audio synth
+│   │   │   └── midi.ts             Built-in MIDI parser
+│   │   ├── canvas/
+│   │   │   └── Particles.tsx       Particle + ParticlePool classes
+│   │   ├── export/
+│   │   │   └── FFMPEGVideoExporter.ts  FFmpeg WASM loader/encoder and export config
+│   │   └── layout/
+│   │       └── layoutUtils.ts      Keyboard layout, colors, time formatting helpers
+│   ├── hooks/
+│   │   ├── useExport.ts            Export UI state, FFmpeg orchestration, OPFS download helper
+│   │   └── useMidi.ts              Reserved for future MIDI hook extraction
+│   └── utils/
+│       ├── error.ts                Error-to-string helper
+│       └── layout.ts               Piano constants
+├── index.html
+├── package.json
+├── tsconfig*.json
+├── vite.config.ts                  React/Tailwind/PWA config + FFmpeg-related dev headers
+└── AGENTS.md                       Codebase guide for AI agents and maintainers
 ```
 
 ## Application Flow
@@ -63,27 +85,29 @@ midivisualizer/
 ```mermaid
 flowchart TD
     Start[App mounts] --> InitMIDI[Request Web MIDI access]
-    Start --> LoadDemo[Load demo song into midiData ref]
+    Start --> LoadDemo[Load generated demo song]
     Start --> CanvasLoop[Start requestAnimationFrame loop]
     InitMIDI --> LiveInput[Hardware MIDI messages]
     LiveInput --> SynthLive[WebAudioSynth play/stop]
     LiveInput --> ActiveNotes[activeNotes ref]
     Upload[User uploads .mid/.midi] --> Parser[parseMIDIArrayBuffer]
-    Parser --> MidiData[midiData ref: notes + duration]
+    Parser --> MidiData[midiData ref]
     Play[User presses Play] --> Clock[performance.now playback clock]
     Clock --> CanvasLoop
     MidiData --> CanvasLoop
     ActiveNotes --> CanvasLoop
-    CanvasLoop --> DrawNotes[Draw falling notes]
-    CanvasLoop --> TriggerPlaybackAudio[Trigger note audio when crossing note time]
-    CanvasLoop --> DrawKeyboard[Draw highlighted 88-key keyboard]
-    CanvasLoop --> Particles[Update/draw particles]
-    Export[Export Video] --> Worker[Worker writes PNG frames to OPFS]
-    Worker --> MockEncode[Simulated FFmpeg/WASM MP4 step]
-    MockEncode --> Download[Download export.mp4]
+    CanvasLoop --> DrawNotes[Draw visible falling notes]
+    CanvasLoop --> TriggerPlaybackAudio[Trigger crossed note starts]
+    CanvasLoop --> DrawKeyboard[Draw highlighted keyboard]
+    CanvasLoop --> Particles[Update/draw particle pool]
+    Export[Export Video] --> Capture[Capture canvas PNG frames]
+    Capture --> Worker[Worker writes frames to OPFS]
+    Worker --> FFMPEG[FFmpeg WASM encodes MP4]
+    FFMPEG --> OPFSVideo[Save export.mp4 to OPFS]
+    OPFSVideo --> Download[Download Video]
 ```
 
-### 1. Startup
+### Startup
 
 On mount, `App`:
 
@@ -93,10 +117,10 @@ On mount, `App`:
 4. Starts the canvas animation loop.
 5. Cleans up animation frames and any export worker on unmount.
 
-The app also shows an **Enable Audio** banner until a user gesture
-initializes/resumes the Web Audio context.
+The app shows an **Enable Audio** banner until a user gesture initializes/resumes
+the Web Audio context.
 
-### 2. MIDI Data Model
+### MIDI Data Model
 
 MIDI notes are normalized to this shape:
 
@@ -114,101 +138,112 @@ MIDI notes are normalized to this shape:
 
 ```ts
 {
-  notes: Note[];
+  notes: MidiNote[];
   duration: number;
 }
 ```
 
-Refs are used for frequently updated data (`midiData`, `activeNotes`, playback
-timing, worker state) so the 60fps render loop does not force unnecessary React
-re-renders.
+Parsed notes are sorted by `time` so the render loop can skip off-screen notes
+and break early once future notes are beyond the visible window.
 
-### 3. MIDI File Parsing
+### Playback Timing and Performance
 
-`parseMIDIArrayBuffer` in `src/App.tsx` parses standard MIDI file bytes
-directly:
+Playback uses `performance.now()` instead of an external transport scheduler.
+Render-critical values are kept in refs so the animation callback remains stable
+and does not restart on every UI state change.
 
-- Validates the `MThd` header.
-- Reads track chunks (`MTrk`).
-- Handles variable-length delta times.
-- Supports running status.
-- Extracts note-on/note-off pairs.
-- Reads tempo meta events (`0xFF 0x51`).
-- Converts ticks to seconds using tempo changes.
+Important refs/state include:
 
-This parser is intentionally local and dependency-free. If you replace it with a
-library parser, preserve the app’s normalized note shape or update all
-consumers.
+- `playbackStartTime.current`: wall-clock playback offset
+- `pausedTime.current`: current paused/seek position
+- `currentTimeRef.current`: current playback position used by the render loop
+- `currentTime`: React state used only for UI display/slider updates
+- `lastUIUpdateRef.current`: throttles UI time updates to roughly 10fps
+- `isPlayingRef`, `fallSpeedRef`, `leftColorRef`, `rightColorRef`,
+  `particlesEnabledRef`, `durationRef`: render-loop-safe mirrors of UI state
+- `lastTimeSec.current`: used to trigger playback audio once when note starts are crossed
 
-### 4. Playback Timing and Audio
+### Canvas Rendering
 
-Playback uses `performance.now()` instead of Tone.Transport:
+`renderCanvas` in `src/App.tsx` is the hot path. Each frame it:
 
-- `playbackStartTime.current` stores the wall-clock start offset.
-- `pausedTime.current` stores the seek/pause position.
-- `currentTime` is React state for UI display and slider control.
-- `lastTimeSec.current` is used to detect newly crossed notes and trigger audio
-  once.
+1. Computes `dt`, clamped to avoid huge frame-drop jumps.
+2. Computes current playback time from refs.
+3. Updates `currentTime` React state only periodically for UI display.
+4. Clears the canvas.
+5. Computes keyboard layout for the current canvas width.
+6. Iterates only the MIDI notes inside the visible time window.
+7. Draws falling note bars.
+8. Triggers synthesized audio for notes whose start time was crossed this frame.
+9. Tracks active playback notes and live MIDI notes for key highlighting.
+10. Emits particles at the keyboard hit line.
+11. Draws the hit line, particles, white keys, then black keys.
+12. Captures a PNG export frame when export capture is active and enough time has elapsed.
 
-`WebAudioSynth` is a simple custom synth:
-
-- Lazily creates/resumes `AudioContext` after a user gesture.
-- Converts MIDI note numbers to Hz.
-- Uses a triangle oscillator plus a sine oscillator one octave above.
-- Applies a short attack and decay envelope with `GainNode` automation.
-- Tracks active voices in a `Map` by MIDI note number.
-
-### 5. Canvas Rendering
-
-`renderCanvas` is the core animation loop. Each frame:
-
-1. Calculates `dt` and current playback time.
-2. Clears the canvas with a dark background.
-3. Computes keyboard layout for the current canvas width.
-4. Draws visible falling note bars.
-5. Triggers playback audio for notes whose start time was crossed this frame.
-6. Builds an `activeMap` from live MIDI and current playback notes.
-7. Emits particles at the keyboard hit line for active playback notes.
-8. Draws the red hit line.
-9. Updates/draws the particle pool.
-10. Draws white keys, then black keys, highlighting active notes.
-11. Captures a PNG frame to OPFS if export is active.
-12. Schedules the next `requestAnimationFrame`.
-
-### 6. Keyboard Layout
-
-The keyboard constants live near the top of `src/App.tsx`:
+Coordinate model:
 
 ```ts
-const FIRST_NOTE = 21; // A0
-const LAST_NOTE = 108; // C8
-const KEYBOARD_HEIGHT = 120;
-const HAND_SPLIT_NOTE = 60; // Middle C
+const hitLineY = canvas.height - KEYBOARD_HEIGHT;
+const timeUntilHit = note.time - timeSec;
+const yBottom = hitLineY - timeUntilHit * fallSpeed;
+const noteHeight = note.duration * fallSpeed;
+const yTop = yBottom - noteHeight;
 ```
 
-`getLayout(width)` calculates positions for all 88 notes:
+### Audio
 
-- 52 white keys are evenly distributed across the canvas width.
-- 36 black keys are placed relative to the previous white key.
-- `isBlackKey(midi)` checks pitch class `[1, 3, 6, 8, 10]`.
+`src/features/audio/WebAudioSynth.ts` provides the current audio path:
 
-### 7. Export Flow
+- Lazily creates/resumes `AudioContext` from user gesture paths.
+- Converts MIDI note numbers to frequencies.
+- Uses simple oscillator/gain envelopes for lightweight playback.
+- Tracks active voices by MIDI note.
+- Honors the app mute toggle via `audioSynth.current.isMuted`.
 
-The export feature is experimental:
+### Particles
 
-1. `startExport` checks OPFS support and creates an inline Web Worker from
-   `WORKER_CODE`.
-2. The worker initializes/clears an OPFS `frames` directory.
-3. Playback restarts from `0` while `renderCanvas` sends each captured canvas
-   PNG to the worker.
-4. When playback reaches the end, `mockExportViaFFMPEGWASM` reads frame names
-   from OPFS.
-5. The current implementation simulates encoding and writes an `export.mp4`
-   placeholder/fetched mock video to OPFS.
-6. `downloadVideo` downloads `export.mp4` and clears captured frames.
+`src/features/canvas/Particles.tsx` contains an object-pooled particle system.
+Particles use pixels-per-second velocity and update with `dt`, so motion is
+frame-rate independent. The draw path avoids per-particle `shadowBlur` and
+per-particle `save()`/`restore()` calls; the pool wraps the pass once with
+additive blending.
 
-Because encoding is currently mocked, do not describe export as production-grade
-video encoding without updating the implementation.
+### Export Flow
+
+The export feature now performs real browser-side MP4 encoding with FFmpeg WASM.
+It is still browser-resource-heavy and depends on OPFS and modern browser support.
+
+1. `startExport()` checks OPFS support.
+2. `App.tsx` creates an inline Web Worker from `WORKER_CODE`.
+3. The worker initializes and clears an OPFS `frames` directory.
+4. Playback restarts from `0` and export capture begins.
+5. `renderCanvas` captures PNG frames with `canvas.toBlob` at the configured export interval.
+6. The worker writes frames as `frame_00000.png`, `frame_00001.png`, etc.
+7. When playback ends, `App.tsx` waits for pending frame writes to finish.
+8. `useExport.exportViaFFMPEGWASM(durationSeconds)` loads/reuses FFmpeg WASM.
+9. `FfmpegVideoExporter.exportVideo(...)` reads OPFS frames into FFmpeg’s virtual FS.
+10. FFmpeg encodes `output.mp4` with H.264.
+11. The MP4 is saved back to OPFS as `export.mp4`.
+12. The overlay shows **Download Video**, and `downloadVideoFromOPFS` downloads the MP4 and clears frames.
+
+Important export details:
+
+- `exportConfig` in `src/features/export/FFMPEGVideoExporter.ts` defines the nominal FPS, frame interval, directory, file name, and extension.
+- Canvas frame capture can miss the nominal FPS because `canvas.toBlob` and OPFS writes are async.
+- To keep the exported duration aligned with the source song, FFmpeg’s input `-framerate` is computed from:
+
+  ```text
+  captured frame count / source duration seconds
+  ```
+
+- The FFmpeg filter chain forces even H.264 dimensions and yuv420p output:
+
+  ```text
+  scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p
+  ```
+
+- `vite.config.ts` sets COOP/COEP dev headers and excludes FFmpeg packages from Vite dependency pre-bundling.
+- The PWA Workbox config caches FFmpeg core files from jsDelivr for faster subsequent loads.
 
 ## Vite and PWA Configuration
 
@@ -217,13 +252,13 @@ video encoding without updating the implementation.
 - `@vitejs/plugin-react`
 - `@tailwindcss/vite`
 - `vite-plugin-pwa` with `registerType: "autoUpdate"`
-- A PWA manifest named **FlowKeys - Real-time MIDI Visualizer**
-- Landscape-oriented standalone display metadata
-- Static asset inclusion for `favicon.svg` and `og-image.svg`
-- Workbox precaching for common build/static asset types
+- App manifest metadata for FlowKeys
+- Workbox precaching for common build/static assets
 - Runtime caching for Google Fonts CSS
+- Runtime caching for `@ffmpeg/core` ESM assets from jsDelivr
 - `navigateFallback: null`
-- PWA disabled during dev (`devOptions.enabled: false`)
+- Dev `Cross-Origin-Opener-Policy` / `Cross-Origin-Embedder-Policy` headers for FFmpeg/WASM compatibility
+- `optimizeDeps.exclude` for `@ffmpeg/ffmpeg` and `@ffmpeg/util`
 
 `src/main.tsx` registers the generated service worker and prompts when a refresh
 is available.
@@ -235,7 +270,7 @@ is available.
 - Node.js compatible with Vite 7
 - npm
 - A modern browser with Canvas and Web Audio support
-- Chrome/Edge recommended for Web MIDI and OPFS support
+- Chrome/Edge recommended for Web MIDI, OPFS, and FFmpeg WASM export
 - Optional USB MIDI keyboard/controller
 
 ### Install and Run
@@ -267,8 +302,7 @@ npm run lint
 1. Open the app.
 2. Click **Enable Audio** if you want sound.
 3. Press **Play**.
-4. Use the speed slider, particle toggle, mute button, and timeline slider as
-   needed.
+4. Use the speed slider, particle toggle, mute button, and timeline slider as needed.
 
 ### Upload a MIDI File
 
@@ -288,25 +322,29 @@ npm run lint
 Use the left/right hand controls over the canvas. Notes below Middle C use the
 left-hand color; notes at or above Middle C use the right-hand color.
 
+### Export Video
+
+1. Click **Export Video**.
+2. Wait while the app captures frames and FFmpeg WASM encodes the MP4.
+3. Click **Download Video** when the overlay says export is complete.
+
+First export may take longer because the browser downloads and initializes the
+FFmpeg core. Later exports may be faster due to service worker/runtime caching.
+
 ## Browser Support Notes
 
-- **Chrome/Edge**: Best support for Web MIDI, Web Audio, Canvas, OPFS, and PWA
-  behavior.
-- **Firefox/Safari**: Canvas and Web Audio work, but Web MIDI and OPFS support
-  may be missing or limited.
+- **Chrome/Edge**: Best support for Web MIDI, Web Audio, Canvas, OPFS, PWA behavior, and FFmpeg WASM export.
+- **Firefox/Safari**: Canvas and Web Audio work, but Web MIDI, OPFS, and export support may be missing or limited.
 - Audio initialization requires a user gesture due to browser autoplay policies.
+- FFmpeg WASM export is CPU/RAM intensive and can be slow for long songs or large canvases.
 
 ## Development Notes
 
-- Most app logic currently lives in `src/App.tsx`. See `AGENTS.md` before making
-  larger changes.
+- `App.tsx` still owns orchestration and the canvas render loop. See `AGENTS.md` before making larger changes.
 - Keep render-loop data in refs unless React state is needed for UI.
-- Be careful with `renderCanvas` dependencies; changing them can restart the
-  animation effect.
-- The MIDI parser currently supports the MIDI events needed for note
-  visualization/playback, but it is not a complete general-purpose MIDI
-  implementation.
-- Video export is an OPFS frame-capture prototype with mocked encoding.
+- Be careful with `renderCanvas` dependencies; it is intentionally stable and scheduled by a surrounding effect.
+- The MIDI parser supports the events needed for note visualization/playback, but it is not a complete general-purpose MIDI implementation.
+- Export is real FFmpeg WASM MP4 encoding, but it remains experimental because it depends on browser OPFS/WASM performance.
 
 ## License
 
