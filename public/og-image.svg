@@ -2,105 +2,384 @@
   <!-- Background gradient -->
   <defs>
     <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#0f172a;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#1e293b;stop-opacity:1" />
+      <stop offset="0%" style="stop-color: #0f172a; stop-opacity: 1" />
+      <stop offset="100%" style="stop-color: #1e293b; stop-opacity: 1" />
     </linearGradient>
     <linearGradient id="accentGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#10b981;stop-opacity:1" />
+      <stop offset="0%" style="stop-color: #3b82f6; stop-opacity: 1" />
+      <stop offset="100%" style="stop-color: #10b981; stop-opacity: 1" />
     </linearGradient>
   </defs>
 
   <!-- Background -->
-  <rect width="1200" height="630" fill="url(#bgGradient)"/>
+  <rect width="1200" height="630" fill="url(#bgGradient)" />
 
   <!-- Grid pattern -->
   <g opacity="0.1">
-    <line x1="0" y1="150" x2="1200" y2="150" stroke="#60a5fa" stroke-width="1"/>
-    <line x1="0" y1="300" x2="1200" y2="300" stroke="#60a5fa" stroke-width="1"/>
-    <line x1="0" y1="450" x2="1200" y2="450" stroke="#60a5fa" stroke-width="1"/>
+    <line
+      x1="0"
+      y1="150"
+      x2="1200"
+      y2="150"
+      stroke="#60a5fa"
+      stroke-width="1"
+    />
+    <line
+      x1="0"
+      y1="300"
+      x2="1200"
+      y2="300"
+      stroke="#60a5fa"
+      stroke-width="1"
+    />
+    <line
+      x1="0"
+      y1="450"
+      x2="1200"
+      y2="450"
+      stroke="#60a5fa"
+      stroke-width="1"
+    />
   </g>
 
   <!-- Falling notes visualization -->
   <g opacity="0.6">
     <!-- Left side notes -->
-    <rect x="150" y="80" width="40" height="120" rx="4" fill="#3b82f6"/>
-    <rect x="210" y="140" width="40" height="90" rx="4" fill="#60a5fa"/>
-    <rect x="270" y="100" width="40" height="150" rx="4" fill="#2563eb"/>
+    <rect x="150" y="80" width="40" height="120" rx="4" fill="#3b82f6" />
+    <rect x="210" y="140" width="40" height="90" rx="4" fill="#60a5fa" />
+    <rect x="270" y="100" width="40" height="150" rx="4" fill="#2563eb" />
 
     <!-- Center notes -->
-    <rect x="400" y="50" width="50" height="180" rx="4" fill="#3b82f6"/>
-    <rect x="470" y="120" width="50" height="110" rx="4" fill="#60a5fa"/>
-    <rect x="540" y="70" width="50" height="160" rx="4" fill="#3b82f6"/>
-    <rect x="610" y="110" width="50" height="120" rx="4" fill="#2563eb"/>
-    <rect x="680" y="90" width="50" height="140" rx="4" fill="#60a5fa"/>
-    <rect x="750" y="130" width="50" height="100" rx="4" fill="#3b82f6"/>
+    <rect x="400" y="50" width="50" height="180" rx="4" fill="#3b82f6" />
+    <rect x="470" y="120" width="50" height="110" rx="4" fill="#60a5fa" />
+    <rect x="540" y="70" width="50" height="160" rx="4" fill="#3b82f6" />
+    <rect x="610" y="110" width="50" height="120" rx="4" fill="#2563eb" />
+    <rect x="680" y="90" width="50" height="140" rx="4" fill="#60a5fa" />
+    <rect x="750" y="130" width="50" height="100" rx="4" fill="#3b82f6" />
 
     <!-- Right side notes -->
-    <rect x="890" y="110" width="40" height="120" rx="4" fill="#2563eb"/>
-    <rect x="950" y="70" width="40" height="160" rx="4" fill="#60a5fa"/>
-    <rect x="1010" y="140" width="40" height="90" rx="4" fill="#3b82f6"/>
+    <rect x="890" y="110" width="40" height="120" rx="4" fill="#2563eb" />
+    <rect x="950" y="70" width="40" height="160" rx="4" fill="#60a5fa" />
+    <rect x="1010" y="140" width="40" height="90" rx="4" fill="#3b82f6" />
   </g>
 
   <!-- Piano keyboard -->
   <g transform="translate(100, 400)">
     <!-- White keys -->
-    <rect x="0" y="0" width="80" height="200" rx="4" fill="#f8fafc" stroke="#cbd5e1" stroke-width="2"/>
-    <rect x="85" y="0" width="80" height="200" rx="4" fill="#f8fafc" stroke="#cbd5e1" stroke-width="2"/>
-    <rect x="170" y="0" width="80" height="200" rx="4" fill="#3b82f6" stroke="#2563eb" stroke-width="2"/>
-    <rect x="255" y="0" width="80" height="200" rx="4" fill="#f8fafc" stroke="#cbd5e1" stroke-width="2"/>
-    <rect x="340" y="0" width="80" height="200" rx="4" fill="#3b82f6" stroke="#2563eb" stroke-width="2"/>
-    <rect x="425" y="0" width="80" height="200" rx="4" fill="#f8fafc" stroke="#cbd5e1" stroke-width="2"/>
-    <rect x="510" y="0" width="80" height="200" rx="4" fill="#f8fafc" stroke="#cbd5e1" stroke-width="2"/>
-    <rect x="595" y="0" width="80" height="200" rx="4" fill="#f8fafc" stroke="#cbd5e1" stroke-width="2"/>
-    <rect x="680" y="0" width="80" height="200" rx="4" fill="#3b82f6" stroke="#2563eb" stroke-width="2"/>
-    <rect x="765" y="0" width="80" height="200" rx="4" fill="#f8fafc" stroke="#cbd5e1" stroke-width="2"/>
-    <rect x="850" y="0" width="80" height="200" rx="4" fill="#f8fafc" stroke="#cbd5e1" stroke-width="2"/>
-    <rect x="935" y="0" width="80" height="200" rx="4" fill="#f8fafc" stroke="#cbd5e1" stroke-width="2"/>
+    <rect
+      x="0"
+      y="0"
+      width="80"
+      height="200"
+      rx="4"
+      fill="#f8fafc"
+      stroke="#cbd5e1"
+      stroke-width="2"
+    />
+    <rect
+      x="85"
+      y="0"
+      width="80"
+      height="200"
+      rx="4"
+      fill="#f8fafc"
+      stroke="#cbd5e1"
+      stroke-width="2"
+    />
+    <rect
+      x="170"
+      y="0"
+      width="80"
+      height="200"
+      rx="4"
+      fill="#3b82f6"
+      stroke="#2563eb"
+      stroke-width="2"
+    />
+    <rect
+      x="255"
+      y="0"
+      width="80"
+      height="200"
+      rx="4"
+      fill="#f8fafc"
+      stroke="#cbd5e1"
+      stroke-width="2"
+    />
+    <rect
+      x="340"
+      y="0"
+      width="80"
+      height="200"
+      rx="4"
+      fill="#3b82f6"
+      stroke="#2563eb"
+      stroke-width="2"
+    />
+    <rect
+      x="425"
+      y="0"
+      width="80"
+      height="200"
+      rx="4"
+      fill="#f8fafc"
+      stroke="#cbd5e1"
+      stroke-width="2"
+    />
+    <rect
+      x="510"
+      y="0"
+      width="80"
+      height="200"
+      rx="4"
+      fill="#f8fafc"
+      stroke="#cbd5e1"
+      stroke-width="2"
+    />
+    <rect
+      x="595"
+      y="0"
+      width="80"
+      height="200"
+      rx="4"
+      fill="#f8fafc"
+      stroke="#cbd5e1"
+      stroke-width="2"
+    />
+    <rect
+      x="680"
+      y="0"
+      width="80"
+      height="200"
+      rx="4"
+      fill="#3b82f6"
+      stroke="#2563eb"
+      stroke-width="2"
+    />
+    <rect
+      x="765"
+      y="0"
+      width="80"
+      height="200"
+      rx="4"
+      fill="#f8fafc"
+      stroke="#cbd5e1"
+      stroke-width="2"
+    />
+    <rect
+      x="850"
+      y="0"
+      width="80"
+      height="200"
+      rx="4"
+      fill="#f8fafc"
+      stroke="#cbd5e1"
+      stroke-width="2"
+    />
+    <rect
+      x="935"
+      y="0"
+      width="80"
+      height="200"
+      rx="4"
+      fill="#f8fafc"
+      stroke="#cbd5e1"
+      stroke-width="2"
+    />
 
     <!-- Black keys -->
-    <rect x="60" y="0" width="50" height="130" rx="3" fill="#1e293b" stroke="#0f172a" stroke-width="2"/>
-    <rect x="145" y="0" width="50" height="130" rx="3" fill="#1e293b" stroke="#0f172a" stroke-width="2"/>
-    <rect x="315" y="0" width="50" height="130" rx="3" fill="#1e293b" stroke="#0f172a" stroke-width="2"/>
-    <rect x="400" y="0" width="50" height="130" rx="3" fill="#1e293b" stroke="#0f172a" stroke-width="2"/>
-    <rect x="485" y="0" width="50" height="130" rx="3" fill="#1e293b" stroke="#0f172a" stroke-width="2"/>
-    <rect x="655" y="0" width="50" height="130" rx="3" fill="#1e293b" stroke="#0f172a" stroke-width="2"/>
-    <rect x="740" y="0" width="50" height="130" rx="3" fill="#1e293b" stroke="#0f172a" stroke-width="2"/>
-    <rect x="910" y="0" width="50" height="130" rx="3" fill="#1e293b" stroke="#0f172a" stroke-width="2"/>
+    <rect
+      x="60"
+      y="0"
+      width="50"
+      height="130"
+      rx="3"
+      fill="#1e293b"
+      stroke="#0f172a"
+      stroke-width="2"
+    />
+    <rect
+      x="145"
+      y="0"
+      width="50"
+      height="130"
+      rx="3"
+      fill="#1e293b"
+      stroke="#0f172a"
+      stroke-width="2"
+    />
+    <rect
+      x="315"
+      y="0"
+      width="50"
+      height="130"
+      rx="3"
+      fill="#1e293b"
+      stroke="#0f172a"
+      stroke-width="2"
+    />
+    <rect
+      x="400"
+      y="0"
+      width="50"
+      height="130"
+      rx="3"
+      fill="#1e293b"
+      stroke="#0f172a"
+      stroke-width="2"
+    />
+    <rect
+      x="485"
+      y="0"
+      width="50"
+      height="130"
+      rx="3"
+      fill="#1e293b"
+      stroke="#0f172a"
+      stroke-width="2"
+    />
+    <rect
+      x="655"
+      y="0"
+      width="50"
+      height="130"
+      rx="3"
+      fill="#1e293b"
+      stroke="#0f172a"
+      stroke-width="2"
+    />
+    <rect
+      x="740"
+      y="0"
+      width="50"
+      height="130"
+      rx="3"
+      fill="#1e293b"
+      stroke="#0f172a"
+      stroke-width="2"
+    />
+    <rect
+      x="910"
+      y="0"
+      width="50"
+      height="130"
+      rx="3"
+      fill="#1e293b"
+      stroke="#0f172a"
+      stroke-width="2"
+    />
   </g>
 
   <!-- Now line -->
-  <line x1="100" y1="400" x2="1100" y2="400" stroke="#3b82f6" stroke-width="4" stroke-linecap="round"/>
+  <line
+    x1="100"
+    y1="400"
+    x2="1100"
+    y2="400"
+    stroke="#3b82f6"
+    stroke-width="4"
+    stroke-linecap="round"
+  />
 
   <!-- Logo and title -->
   <g transform="translate(100, 80)">
     <!-- Logo icon -->
-    <rect width="80" height="80" rx="16" fill="url(#accentGradient)"/>
+    <rect width="80" height="80" rx="16" fill="url(#accentGradient)" />
     <g transform="translate(15, 20)">
-      <rect x="0" y="0" width="10" height="30" rx="2" fill="#f8fafc"/>
-      <rect x="12" y="0" width="10" height="30" rx="2" fill="#f8fafc"/>
-      <rect x="24" y="0" width="10" height="30" rx="2" fill="#f8fafc"/>
-      <rect x="36" y="0" width="10" height="30" rx="2" fill="#f8fafc"/>
-      <rect x="8" y="0" width="7" height="20" rx="1" fill="#0f172a"/>
-      <rect x="20" y="0" width="7" height="20" rx="1" fill="#0f172a"/>
-      <rect x="32" y="0" width="7" height="20" rx="1" fill="#0f172a"/>
-      <line x1="0" y1="30" x2="46" y2="30" stroke="#f8fafc" stroke-width="2" stroke-linecap="round"/>
+      <rect x="0" y="0" width="10" height="30" rx="2" fill="#f8fafc" />
+      <rect x="12" y="0" width="10" height="30" rx="2" fill="#f8fafc" />
+      <rect x="24" y="0" width="10" height="30" rx="2" fill="#f8fafc" />
+      <rect x="36" y="0" width="10" height="30" rx="2" fill="#f8fafc" />
+      <rect x="8" y="0" width="7" height="20" rx="1" fill="#0f172a" />
+      <rect x="20" y="0" width="7" height="20" rx="1" fill="#0f172a" />
+      <rect x="32" y="0" width="7" height="20" rx="1" fill="#0f172a" />
+      <line
+        x1="0"
+        y1="30"
+        x2="46"
+        y2="30"
+        stroke="#f8fafc"
+        stroke-width="2"
+        stroke-linecap="round"
+      />
     </g>
 
     <!-- Title -->
-    <text x="100" y="50" font-family="system-ui, -apple-system, sans-serif" font-size="56" font-weight="bold" fill="url(#accentGradient)">FlowKeys</text>
-    <text x="100" y="90" font-family="system-ui, -apple-system, sans-serif" font-size="24" font-weight="500" fill="#94a3b8">Real-time MIDI Visualizer</text>
+    <text
+      x="100"
+      y="50"
+      font-family="system-ui, -apple-system, sans-serif"
+      font-size="56"
+      font-weight="bold"
+      fill="url(#accentGradient)"
+    >FlowKeys</text>
+    <text
+      x="100"
+      y="90"
+      font-family="system-ui, -apple-system, sans-serif"
+      font-size="24"
+      font-weight="500"
+      fill="#94a3b8"
+    >Real-time MIDI Visualizer</text>
   </g>
 
   <!-- Feature badges -->
   <g transform="translate(100, 250)">
-    <rect x="0" y="0" width="200" height="50" rx="25" fill="#1e293b" opacity="0.8"/>
-    <text x="100" y="33" font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="600" fill="#60a5fa" text-anchor="middle">🎹 Live Input</text>
+    <rect
+      x="0"
+      y="0"
+      width="200"
+      height="50"
+      rx="25"
+      fill="#1e293b"
+      opacity="0.8"
+    />
+    <text
+      x="100"
+      y="33"
+      font-family="system-ui, -apple-system, sans-serif"
+      font-size="20"
+      font-weight="600"
+      fill="#60a5fa"
+      text-anchor="middle"
+    >🎹 Live Input</text>
 
-    <rect x="220" y="0" width="200" height="50" rx="25" fill="#1e293b" opacity="0.8"/>
-    <text x="320" y="33" font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="600" fill="#60a5fa" text-anchor="middle">🎵 MIDI Files</text>
+    <rect
+      x="220"
+      y="0"
+      width="200"
+      height="50"
+      rx="25"
+      fill="#1e293b"
+      opacity="0.8"
+    />
+    <text
+      x="320"
+      y="33"
+      font-family="system-ui, -apple-system, sans-serif"
+      font-size="20"
+      font-weight="600"
+      fill="#60a5fa"
+      text-anchor="middle"
+    >🎵 MIDI Files</text>
 
-    <rect x="440" y="0" width="200" height="50" rx="25" fill="#1e293b" opacity="0.8"/>
-    <text x="540" y="33" font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="600" fill="#60a5fa" text-anchor="middle">🎨 60 FPS</text>
+    <rect
+      x="440"
+      y="0"
+      width="200"
+      height="50"
+      rx="25"
+      fill="#1e293b"
+      opacity="0.8"
+    />
+    <text
+      x="540"
+      y="33"
+      font-family="system-ui, -apple-system, sans-serif"
+      font-size="20"
+      font-weight="600"
+      fill="#60a5fa"
+      text-anchor="middle"
+    >🎨 60 FPS</text>
   </g>
 </svg>

@@ -30,7 +30,7 @@ const pwaPlugin = VitePWA({
   workbox: {
     // 1. This handles your local npm packages (@ffmpeg/ffmpeg, @ffmpeg/util)
     // because Vite bundles them into .js files.
-    globPatterns: ["**/*.{js,css,html,svg,png,ico,txt,woff2}"],
+    globPatterns: ["**/*.{js,css,html,svg,png,jpeg,jpg,ico,txt,woff2}"],
 
     runtimeCaching: [
       {

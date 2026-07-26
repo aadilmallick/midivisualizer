@@ -125,11 +125,9 @@ export const Toolbar = ({
             : "bg-red-500/10 border-red-500/40 text-red-400"
         }`}
       >
-        {isMuted ? (
-          <VolumeX className="w-5 h-5" />
-        ) : (
-          <Volume2 className="w-5 h-5" />
-        )}
+        {isMuted
+          ? <VolumeX className="w-5 h-5" />
+          : <Volume2 className="w-5 h-5" />}
       </button>
 
       <label className="flex items-center gap-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-700/80 border border-slate-700 rounded-xl cursor-pointer transition-all text-sm font-semibold text-slate-200 shadow-md">
@@ -166,17 +164,19 @@ export const Toolbar = ({
             : "bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-emerald-500/25"
         } ${!isReady ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
       >
-        {isPlaying ? (
-          <>
-            <Pause className="w-4 h-4 fill-slate-950" />
-            <span>Pause</span>
-          </>
-        ) : (
-          <>
-            <Play className="w-4 h-4 fill-slate-950" />
-            <span>Play</span>
-          </>
-        )}
+        {isPlaying
+          ? (
+            <>
+              <Pause className="w-4 h-4 fill-slate-950" />
+              <span>Pause</span>
+            </>
+          )
+          : (
+            <>
+              <Play className="w-4 h-4 fill-slate-950" />
+              <span>Play</span>
+            </>
+          )}
       </button>
     </div>
   </header>

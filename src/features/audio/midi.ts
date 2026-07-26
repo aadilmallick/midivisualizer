@@ -96,8 +96,7 @@ export function parseMIDIArrayBuffer(buffer: ArrayBuffer): MidiData {
         const metaType = view.getUint8(offset++);
         const metaLen = readVarInt();
         if (metaType === 0x51 && metaLen === 3) {
-          const tempo =
-            (view.getUint8(offset) << 16) |
+          const tempo = (view.getUint8(offset) << 16) |
             (view.getUint8(offset + 1) << 8) |
             view.getUint8(offset + 2);
           tempoEvents.push({ tick: currentTick, tempo });
@@ -126,14 +125,13 @@ export function parseMIDIArrayBuffer(buffer: ArrayBuffer): MidiData {
 
     for (const event of tempoEvents) {
       if (tick <= event.tick) break;
-      time +=
-        ((event.tick - prevTick) / ticksPerQuarterNote) *
+      time += ((event.tick - prevTick) / ticksPerQuarterNote) *
         (currentTempo / 1000000);
       prevTick = event.tick;
       currentTempo = event.tempo;
     }
-    time +=
-      ((tick - prevTick) / ticksPerQuarterNote) * (currentTempo / 1000000);
+    time += ((tick - prevTick) / ticksPerQuarterNote) *
+      (currentTempo / 1000000);
     return time;
   }
 

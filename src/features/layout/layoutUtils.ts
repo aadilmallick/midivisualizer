@@ -4,11 +4,12 @@ const { FIRST_NOTE, LAST_NOTE } = pianoConstants;
 
 const hexToRgba = (hex: string, alpha = 1) => {
   let c = hex.replace("#", "");
-  if (c.length === 3)
+  if (c.length === 3) {
     c = c
       .split("")
       .map((x) => x + x)
       .join("");
+  }
   const num = parseInt(c, 16);
   const r = (num >> 16) & 255;
   const g = (num >> 8) & 255;
@@ -64,4 +65,4 @@ const getLayout = (width: number): KeyboardLayout => {
   return { positions, whiteKeyWidth, blackKeyWidth };
 };
 
-export { formatTime, getLayout, getSparkColors, isBlackKey, hexToRgba };
+export { formatTime, getLayout, getSparkColors, hexToRgba, isBlackKey };

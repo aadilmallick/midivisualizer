@@ -3,9 +3,9 @@ import { WebAudioSynth } from "./features/audio/WebAudioSynth";
 import { ParticlePool } from "./features/canvas/Particles";
 import { pianoConstants } from "./utils/layout";
 import {
-  hexToRgba,
   getLayout,
   getSparkColors,
+  hexToRgba,
   isBlackKey,
 } from "./features/layout/layoutUtils";
 import { parseMIDIArrayBuffer } from "./features/audio/midi";
@@ -16,6 +16,7 @@ import { ExportOverlay } from "./components/ExportOverlay";
 import { HandBadge } from "./components/HandBadge";
 import { getErrorMessage } from "./utils/error";
 import { downloadVideoFromOPFS, useExport } from "./hooks/useExport";
+import { exportConfig } from "./features/export/FFMPEGVideoExporter";
 /**
  * Worker Code String for high-throughput OPFS frame writing.
  */
@@ -49,6 +50,8 @@ const WORKER_CODE = `
 
 const { FIRST_NOTE, LAST_NOTE, KEYBOARD_HEIGHT, HAND_SPLIT_NOTE } =
   pianoConstants;
+// const EXPORT_FPS = exportConfig.fps;
+const EXPORT_FRAME_INTERVAL_MS = exportConfig.frameIntervalMs;
 
 const App = () => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -66,6 +69,7 @@ const App = () => {
   const pendingFramesRef = useRef(0);
   const isExportingRef = useRef(false);
   const isCapturingFrameRef = useRef(false);
+  const lastExportCaptureTimeRef = useRef(0);
   const frameSavedHandlerRef = useRef<
     ((event: MessageEvent<WorkerMessage>) => void) | null
   >(null);
@@ -381,8 +385,10 @@ const App = () => {
     if (
       isExportingRef.current &&
       workerRef.current &&
-      !isCapturingFrameRef.current
+      !isCapturingFrameRef.current &&
+      now - lastExportCaptureTimeRef.current >= EXPORT_FRAME_INTERVAL_MS
     ) {
+      lastExportCaptureTimeRef.current = now;
       isCapturingFrameRef.current = true;
       canvas.toBlob((blob) => {
         if (blob && isExportingRef.current && workerRef.current) {
@@ -391,12 +397,12 @@ const App = () => {
           pendingFramesRef.current++;
           workerRef.current.postMessage({
             type: "saveFrame",
-            name: `frame_${frameNum}.png`,
+            name: `frame_${frameNum}.${exportConfig.frameExtension}`,
             blob,
           });
         }
         isCapturingFrameRef.current = false;
-      }, "image/png");
+      }, `image/${exportConfig.frameExtension}`);
     }
   }, []);
 
@@ -616,6 +622,7 @@ const App = () => {
 
       exportFrameCountRef.current = 0;
       pendingFramesRef.current = 0;
+      lastExportCaptureTimeRef.current = 0;
 
       if (!audioEnabled) handleEnableAudio();
 

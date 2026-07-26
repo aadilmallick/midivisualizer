@@ -1,23 +1,28 @@
 import { useCallback, useState } from "react";
 import { getErrorMessage } from "../utils/error";
-import { FfmpegVideoExporter } from "../features/export/FFMPEGVideoExporter";
+import {
+  FfmpegVideoExporter,
+  exportConfig,
+} from "../features/export/FFMPEGVideoExporter";
 
 export const downloadVideoFromOPFS = async (fileName?: string) => {
   try {
     const root = await navigator.storage.getDirectory();
-    const videoFh = await root.getFileHandle("export.mp4");
+    const videoFh = await root.getFileHandle(exportConfig.defaultFilename);
     const file = await videoFh.getFile();
     const url = URL.createObjectURL(file);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${fileName ? fileName.replace(/\.[^/.]+$/, "") : "flowkeys"}_export.mp4`;
+    a.download = `${
+      fileName ? fileName.replace(/\.[^/.]+$/, "") : "flowkeys"
+    }_${exportConfig.defaultFilename}`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     window.setTimeout(() => URL.revokeObjectURL(url), 0);
 
     await root
-      .removeEntry("frames", { recursive: true })
+      .removeEntry(exportConfig.directory, { recursive: true })
       .catch(() => undefined);
     return true;
   } catch (error) {
@@ -63,7 +68,7 @@ export const useExport = () => {
       // 2. Traverse OPFS for UI feedback
       const root = await navigator.storage.getDirectory();
       const framesDir = (await root.getDirectoryHandle(
-        "frames",
+        exportConfig.directory,
       )) as FileSystemDirectoryWithIterators;
       const frameNames: string[] = [];
 
@@ -80,13 +85,15 @@ export const useExport = () => {
       setExportProgress(20);
 
       // 3. Process frames and get MP4 blob
-      const videoBlob = await exporter.exportVideo("frames");
+      const videoBlob = await exporter.exportVideo(exportConfig.directory);
 
       setExportProgress(90);
       setExportMessage("Saving compiled video to OPFS storage...");
 
       // 4. Save back to OPFS
-      const videoFh = await root.getFileHandle("export.mp4", { create: true });
+      const videoFh = await root.getFileHandle(exportConfig.defaultFilename, {
+        create: true,
+      });
       const writable = await videoFh.createWritable();
       await writable.write(videoBlob);
       await writable.close();

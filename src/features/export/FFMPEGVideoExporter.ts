@@ -2,6 +2,14 @@ import { FFmpeg } from "@ffmpeg/ffmpeg";
 import { fetchFile, toBlobURL } from "@ffmpeg/util";
 import type { VideoExporter } from "../../types";
 
+export const exportConfig = {
+  fps: 30,
+  frameIntervalMs: 1000 / 30,
+  defaultFilename: "export.mp4",
+  directory: "frames",
+  frameExtension: "png",
+};
+
 export class FfmpegVideoExporter implements VideoExporter {
   private static instance: FfmpegVideoExporter | null = null;
   private static loadPromise: Promise<void> | null = null;
@@ -107,9 +115,9 @@ export class FfmpegVideoExporter implements VideoExporter {
     //   H.264/yuv420p requires even dimensions. Canvas heights can be odd.
     const exitCode = await this.ffmpeg.exec([
       "-framerate",
-      "30",
+      `${exportConfig.fps}`,
       "-i",
-      "frame_%05d.png",
+      `frame_%05d.${exportConfig.frameExtension}`,
       "-vf",
       "scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p",
       "-c:v",

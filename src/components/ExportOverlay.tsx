@@ -29,8 +29,8 @@ export const ExportOverlay = ({
           {exportState === "recording"
             ? "Video exporting..."
             : exportState === "processing"
-              ? "Processing Video..."
-              : "Export Complete!"}
+            ? "Processing Video..."
+            : "Export Complete!"}
         </h2>
 
         {exportState === "recording" && (
