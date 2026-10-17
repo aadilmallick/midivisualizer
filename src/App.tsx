@@ -507,7 +507,7 @@ const App = () => {
         (command & 0xf0) === 128 ||
         ((command & 0xf0) === 144 && velocity === 0);
       const isLeftHand = note < HAND_SPLIT_NOTE;
-      const color = isLeftHand ? leftColor : rightColor;
+      const color = isLeftHand ? leftColorRef.current : rightColorRef.current;
 
       if (isNoteOn) {
         handleEnableAudio();
@@ -518,7 +518,7 @@ const App = () => {
         activeNotes.current.delete(note);
       }
     },
-    [handleEnableAudio, leftColor, rightColor],
+    [handleEnableAudio],
   );
 
   const updateMidiDevices = useCallback((access: MidiAccess) => {
